@@ -79,3 +79,14 @@ O CSV de cada pelada tem também a coluna `criada_em`. Os snapshots são indepen
 ## Próximas melhorias opcionais
 
 Histórico de sorteios, importação CSV, backups versionados, edição em tempo real via WebSocket e previsão de times baseada em posição/goleiro.
+
+## Página pública de cada pelada
+
+- `/pelada/NUMERO` abre sem login. No administrador, sorteie e clique em **Salvar times na página pública**. Use **Abrir página da pelada** ou **Copiar link** para compartilhar.
+- **Atualizar pelada** permite criar partidas, marcar como a jogar/finalizada e corrigir placar, autores e assistências. Cada gol deve ser atribuído a um jogador do time ou marcado como gol contra. Assistências são opcionais.
+- **Resumo** mostra líderes (incluindo empates), classificação por pontos/saldo/gols marcados e rankings de gols e assistências. Partidas a jogar não pontuam.
+- Vitórias valem 3 pontos e empates 1 ponto. Gol contra conta para o time beneficiado, sem crédito individual.
+- Qualquer pessoa com o link pode corrigir partidas. Somente o administrador pode publicar times, modificar nomes/estrelas ou excluir a pelada. Depois de publicar, os convocados ficam fixos; depois de registrar partidas, os times também ficam fixos.
+- `peladas/pelada_N.csv` contém `gols`, `assistencias` e `estado_partidas`. O último campo aponta para um arquivo privado `partidas/pelada_N_UUID.json`, com os times e as partidas daquela revisão. Os totais são recalculados, nunca incrementados manualmente.
+- A revisão é gravada primeiro; depois uma atualização condicional por ETag publica o ponteiro e os totais juntos no CSV. Uma escrita concorrente recebe conflito, mantendo a edição na tela para revisão. Arquivos de revisões anteriores permanecem privados; apenas o ponteiro atual é usado.
+- CSVs antigos continuam funcionando. Ao salvar os times ou editar a pelada, as novas colunas são escritas sem alterar o Ranking Geral.

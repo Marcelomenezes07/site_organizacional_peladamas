@@ -3,6 +3,8 @@ export type Player = {
   name: string;
   aliases: string;
   stars: number;
+  goals?:number;
+  assists?:number;
 };
 export type Ranking = { players: Player[]; etag: string | null };
 export type Pelada = { number: number; createdAt: string; players: Player[]; etag: string | null };

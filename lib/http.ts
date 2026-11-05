@@ -1,3 +1,4 @@
+import {handlePublicPelada} from './public-pelada.js';
 import type { IncomingHttpHeaders } from 'node:http';
 import { authenticated, authConfigured, sessionCookie, validCredentials } from './auth.js';
 import { handleApi } from './service.js';
@@ -5,10 +6,12 @@ import { handleApi } from './service.js';
 const attempts=new Map<string,{count:number;until:number}>();
 type Reply={status:number;value:Record<string,unknown>;cookie?:string};
 export async function handleRequest(path:string,method:string,body:unknown,headers:IncomingHttpHeaders):Promise<Reply>{
-  if(!['/api/auth','/api/data'].includes(path))return {status:404,value:{error:'Não encontrado.'}};
+  const url=new URL(path,'http://localhost');path=url.pathname;
+  if(!['/api/auth','/api/data','/api/pelada'].includes(path))return {status:404,value:{error:'Não encontrado.'}};
   if(!['GET','POST'].includes(method))return {status:405,value:{error:'Método não permitido.'}};
   // A custom header cannot be sent by a cross-origin form. No CORS preflight is allowed.
   if(method==='POST'&&(headers['x-peladamas-request']!=='1'||!headers['content-type']?.includes('application/json')))return {status:403,value:{error:'Solicitação não permitida.'}};
+  if(path==='/api/pelada')return handlePublicPelada(method,Number(url.searchParams.get('number')),body,(body as {action?:string})?.action==='publishTeams'?await authenticated(headers.cookie):false);
   if(path==='/api/auth'){
     if(method==='GET')return {status:200,value:{authenticated:await authenticated(headers.cookie)}};
     const data=body as {action?:unknown;username?:unknown;password?:unknown}|null;

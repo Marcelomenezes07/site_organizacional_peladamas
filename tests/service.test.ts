@@ -28,7 +28,7 @@ describe('Inclusão em lote no Geral',()=>{
     expect(reply.value.addedToRanking).toBe(1);
     const saved=readCsv(memory.docs.get('ranking_geral.csv')!.content).players;
     expect(saved).toEqual([...current,newcomer]);
-    expect(readCsv(memory.docs.get('peladas/pelada_1.csv')!.content).players).toEqual(players);
+    expect(readCsv(memory.docs.get('peladas/pelada_1.csv')!.content).players).toEqual(players.map(p=>({...p,goals:0,assists:0})));
   });
   it('recusar cria a pelada sem gravar no Geral',async()=>{
     expect((await handleApi('POST',{action:'createPelada',players})).status).toBe(201);

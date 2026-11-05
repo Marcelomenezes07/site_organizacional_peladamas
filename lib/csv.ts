@@ -7,8 +7,8 @@ const star = (n: number) => String(n).replace('.', ',');
 export function rankingToCsv(players: Player[]): string {
   return '\ufeff' + [enc(['id','nome','apelidos','estrelas']), ...players.map(p=>enc([p.id,p.name,p.aliases,star(p.stars)]))].join('\r\n') + '\r\n';
 }
-export function peladaToCsv(pelada: Pick<Pelada,'players'|'createdAt'>): string {
-  return '\ufeff' + [enc(['id','nome','apelidos','estrelas','criada_em']), ...pelada.players.map(p=>enc([p.id,p.name,p.aliases,star(p.stars),pelada.createdAt]))].join('\r\n') + '\r\n';
+export function peladaToCsv(pelada: Pick<Pelada,'players'|'createdAt'>&{matchFile?:string}): string {
+  return '\ufeff' + [enc(['id','nome','apelidos','estrelas','criada_em','gols','assistencias','estado_partidas']), ...pelada.players.map(p=>enc([p.id,p.name,p.aliases,star(p.stars),pelada.createdAt,p.goals??0,p.assists??0,pelada.matchFile??'']))].join('\r\n') + '\r\n';
 }
 
 function rows(csv: string): string[][] {
@@ -30,7 +30,7 @@ function rows(csv: string): string[][] {
   if (field || record.length) {record.push(field);result.push(record);}
   return result;
 }
-export function readCsv(csv: string): {players:Player[]; createdAt:string} {
+export function readCsv(csv: string): {players:Player[]; createdAt:string;matchFile?:string} {
   const records=rows(csv);
   if (!records.length) return {players:[],createdAt:''};
   const headers=records[0].map(h=>h.trim().toLowerCase());
@@ -39,8 +39,9 @@ export function readCsv(csv: string): {players:Player[]; createdAt:string} {
   const players:Player[]=records.slice(1).filter(r=>r.some(c=>c.trim())).map(r=>({
     id:r[idx('id')]?.trim()??'', name:r[idx('nome')]?.trim()??'',
     aliases:idx('apelidos')>=0?r[idx('apelidos')]?.trim()??'':'',
-    stars:Number((r[idx('estrelas')]??'').replace(',','.'))
+    stars:Number((r[idx('estrelas')]??'').replace(',','.')),
+    ...(idx('gols')>=0?{goals:Number(r[idx('gols')]||0),assists:Number(r[idx('assistencias')]||0)}:{})
   }));
   const createdAt=idx('criada_em')>=0?records[1]?.[idx('criada_em')]??'':'';
-  return {players,createdAt};
+  return {players,createdAt,matchFile:idx('estado_partidas')>=0?records[1]?.[idx('estado_partidas')]||undefined:undefined};
 }

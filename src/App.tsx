@@ -1,3 +1,4 @@
+import PeladaLinks from './PeladaLinks';
 import { useConfirmation } from './useConfirmation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
@@ -225,6 +226,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           <div className="hint"><Info size={15}/>{view==='geral'?'Notas principais. Peladas novas começam com este ranking.':'Histórico independente: mudar estas estrelas não altera o ranking geral.'}</div>
           {view!=='geral'&&<button className="button danger" disabled={saving} onClick={()=>void deletePelada(Number(view))}><Trash2 size={16}/> Excluir Pelada {view}</button>}
         </div>
+        {view!=='geral'&&<PeladaLinks key={view} number={Number(view)} onSaved={()=>void refresh()}/>}
         <div className="stat-grid">
           <div className="stat"><div className="stat-icon"><Users size={18}/></div><div className="stat-number">{draft.length}</div><div className="stat-label">Jogadores</div></div>
           <div className="stat"><div className="stat-icon"><Sparkles size={18}/></div><div className="stat-number">{formatStars(rankAvg)}</div><div className="stat-label">Média de estrelas</div></div>
@@ -278,6 +280,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           </div>}
         </>:<>
           {!activePelada?<div className="panel"><Empty icon={<FilePlus2 size={28}/>} heading="Ainda não há peladas" detail="Crie a primeira pelada colando a lista do WhatsApp."/><button className="button primary full" onClick={()=>setMode('criar')}><Plus size={17}/> Criar primeira pelada</button></div>:<>
+            <PeladaLinks key={activePelada.number} number={activePelada.number} teams={teams} onSaved={()=>void refresh()}/>
             <div className="panel selector-card"><label className="form-label" htmlFor="sourceSelect">Escolha a pelada</label><div className="select-wrap"><select id="sourceSelect" className="main-select" value={activePelada.number} onChange={e=>selectPelada(Number(e.target.value))}>{state.peladas.map((p,i)=><option key={p.number} value={p.number}>{i===0?'Última — ':''}Pelada {p.number} · {p.players.length} jogadores</option>)}</select><ChevronDown size={17}/></div>
             <div className="hint"><History size={15}/> As estrelas usadas serão as salvas no histórico desta pelada.</div><button className="button danger" disabled={saving} onClick={()=>void deletePelada(activePelada.number)}><Trash2 size={16}/> Excluir Pelada {activePelada.number}</button></div>
             <div className="stat-grid"><div className="stat"><div className="stat-icon"><Users size={18}/></div><div className="stat-number">{activePelada.players.length}</div><div className="stat-label">Convocados</div></div><div className="stat"><div className="stat-icon"><Trophy size={18}/></div><div className="stat-number">{Math.max(2,Math.ceil(activePelada.players.length/perTeam))}</div><div className="stat-label">Times</div></div><div className="stat"><div className="stat-icon"><Sparkles size={18}/></div><div className="stat-number">{formatStars(activePelada.players.reduce((s,p)=>s+p.stars,0))}</div><div className="stat-label">Total de estrelas</div></div></div>

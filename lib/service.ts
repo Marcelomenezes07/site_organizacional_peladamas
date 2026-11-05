@@ -1,3 +1,4 @@
+import {readMatchState} from './public-pelada.js';
 import { readCsv, rankingToCsv, peladaToCsv } from './csv.js';
 import { starterPlayers, type AppState, type Pelada, type Player, type Ranking } from './models.js';
 import { validStars, normalize, matchPlayer } from './logic.js';
@@ -33,7 +34,7 @@ async function peladas():Promise<Pelada[]>{
     const doc=await readDocument(path);if(!doc||doc.content===deletedMarker)return null;
     const parsed=readCsv(doc.content);
     return {number:Number(path.match(/pelada_(\d+)\.csv$/)?.[1]),createdAt:parsed.createdAt,
-      players:checkPlayers(parsed.players,120),etag:doc.etag};
+      players:checkPlayers(parsed.players,120).map(p=>({...p,goals:parsed.players.find(x=>x.id===p.id)?.goals??0,assists:parsed.players.find(x=>x.id===p.id)?.assists??0})),etag:doc.etag};
   }));
   return docs.filter(x=>x!==null).sort((a,b)=>b.number-a.number);
 }
@@ -91,7 +92,10 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
       if(!doc||doc.content===deletedMarker) return output(404,{error:'Pelada não encontrada.'});
       if(typeof data.etag!=='string'||doc.etag!==data.etag)throw new ConflictError();
       const parsed=readCsv(doc.content);
-      await updateDocument(path,peladaToCsv({players,createdAt:parsed.createdAt||new Date().toISOString()}),doc.etag);
+      const matchState=await readMatchState(number,parsed.matchFile);
+      if(matchState.teams.length&&(players.length!==parsed.players.length||players.some(p=>!parsed.players.some(x=>x.id===p.id))))return output(400,{error:'Os convocados não podem mudar depois de salvar os times. Você ainda pode corrigir nomes e estrelas.'});
+      const preserved=players.map(p=>({...p,goals:parsed.players.find(x=>x.id===p.id)?.goals??0,assists:parsed.players.find(x=>x.id===p.id)?.assists??0}));
+      await updateDocument(path,peladaToCsv({players:preserved,createdAt:parsed.createdAt||new Date().toISOString(),matchFile:parsed.matchFile}),doc.etag);
       return output(200,{ok:true});
     }
     if(data.action==='createPelada'){

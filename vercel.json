@@ -17,6 +17,10 @@
     {
       "source": "/adm/",
       "destination": "/index.html"
+    },
+    {
+      "source": "/pelada/:number",
+      "destination": "/index.html"
     }
   ]
 }
