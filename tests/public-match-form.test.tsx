@@ -20,20 +20,20 @@ beforeEach(async()=>{
  await act(async()=>root.render(<PublicPeladaPage number={1}/>));
 });
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
-it('creates a scheduled match using only two team choices; result fields appear afterwards',async()=>{
+it('creates a live match using only two team choices; keeps Edit without a status field',async()=>{
  await click('Criar partida');
  let editor=document.querySelector('.match-editor')!;
  expect(editor.querySelectorAll('select')).toHaveLength(2);
  expect(editor.querySelectorAll('input')).toHaveLength(0);
  expect(editor.textContent).not.toContain('Situação');
  await click('Criar partida',editor);
- expect(api.changePelada).toHaveBeenCalledWith(1,expect.objectContaining({action:'saveMatch',etag:'version-1',match:expect.objectContaining({homeId:'time-1',awayId:'time-2',status:'scheduled',homeScore:0,awayScore:0,goals:[]})}));
+ expect(api.changePelada).toHaveBeenCalledWith(1,expect.objectContaining({action:'saveMatch',etag:'version-1',match:expect.objectContaining({homeId:'time-1',awayId:'time-2',status:'finished',homeScore:0,awayScore:0,goals:[]})}));
  expect(document.querySelector('.match-editor')).toBeNull();
- expect(document.querySelector('.match-card')?.textContent).toContain('A JOGAR');
- await click('Adicionar resultado');
+ expect(document.querySelector('.match-card')?.textContent).toContain('0 × 0');
+ await click('Editar');
  editor=document.querySelector('.match-editor')!;
- expect(editor.querySelectorAll('input[type="number"]')).toHaveLength(2);
- expect(editor.textContent).toContain('Situação');
+ expect(editor.querySelector('.live-score')).not.toBeNull();
+ expect(editor.textContent).not.toContain('Situação');
  await click('Salvar partida',editor);
  expect(api.changePelada).toHaveBeenLastCalledWith(1,expect.objectContaining({etag:'version-2',match:expect.objectContaining({status:'finished',homeScore:0,awayScore:0})}));
  expect(game.matches).toHaveLength(1);
@@ -45,4 +45,19 @@ it('prevents selecting the same team twice and cancels creation without saving',
  expect(selects[1].querySelector<HTMLOptionElement>('option[value="time-1"]')?.disabled).toBe(true);
  await click('Cancelar',document.querySelector('.match-editor')!);await click('Confirmar');
  expect(api.changePelada).not.toHaveBeenCalled();expect(document.querySelector('.match-editor')).toBeNull();
+});
+
+it('adds a goal from the match card, saves its scorer, and corrects it through Edit',async()=>{
+ await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);
+ await click('+ Gol · Time 1',document.querySelector('.match-card')!);
+ let editor=document.querySelector('.match-editor')!;
+ const scorer=editor.querySelector<HTMLSelectElement>('select[aria-label="Quem fez o gol 1"]')!;
+ expect(scorer).not.toBeNull();
+ await act(async()=>{scorer.value='a';scorer.dispatchEvent(new Event('change',{bubbles:true}));});
+ await click('Salvar partida',editor);
+ expect(game.matches[0].homeScore).toBe(1);expect(game.matches[0].goals[0].scorerId).toBe('a');
+ await click('Editar');editor=document.querySelector('.match-editor')!;
+ await click('Remover gol',editor);await click('Salvar partida',editor);
+ expect(game.matches[0].homeScore).toBe(0);expect(game.matches[0].goals).toEqual([]);
+ expect(game.matches).toHaveLength(1);
 });

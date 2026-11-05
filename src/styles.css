@@ -31,3 +31,5 @@ footer{text-align:center;padding:38px 10px 50px;color:#9aa9a0}footer .footer-mar
 .public-team h4{color:#0f806b}.public-team ul{list-style:none;padding:0;margin:8px 0 0}
 .public-team li{padding:10px 0;border-top:1px solid #dce9e1;font-size:14px;overflow-wrap:anywhere}
 .public-tabs button:focus-visible{outline:2px solid #10856e;outline-offset:3px}
+
+.live-score{text-align:center;padding:18px 0;font-size:20px;overflow-wrap:anywhere}.goal-entry>.button{display:block;margin-top:8px}

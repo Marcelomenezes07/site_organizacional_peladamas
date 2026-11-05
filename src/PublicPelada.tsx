@@ -12,24 +12,29 @@ export default function PublicPeladaPage({number}:{number:number}){
   useEffect(()=>{void refresh();const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},12000);const visible=()=>{if(document.visibilityState==='visible')void refresh();};document.addEventListener('visibilitychange',visible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[refresh]);
   const summary=data?summarize(data,data.players):null;
   const teamName=(id:string)=>data?.teams.find(t=>t.id===id)?.name||id;
-  async function edit(match?:Match){
+  async function edit(match?:Match,goalTeam?:string){
     if(!data)return;
     if(draft&&!await confirm('Descartar a edição atual para abrir outra partida?'))return;
-    setDraft(match?{...structuredClone(match),status:'finished'}:{id:crypto.randomUUID(),homeId:data.teams[0].id,awayId:data.teams[1].id,status:'scheduled',homeScore:0,awayScore:0,goals:[]});
+    const next:Match=match?{...structuredClone(match),status:'finished'}:{id:crypto.randomUUID(),homeId:data.teams[0].id,awayId:data.teams[1].id,status:'finished',homeScore:0,awayScore:0,goals:[]};
+    if(goalTeam){if(next.homeScore+next.awayScore>=60)return;const side=goalTeam===next.homeId?'homeScore':'awayScore';if(next[side]>=30)return;next[side]++;next.goals.push({teamId:goalTeam,scorerId:null,assistId:null,ownGoal:false});}
+    setDraft(next);
     setVersion(data.etag);setNotice('');setTab('update');
   }
-  function score(side:'homeScore'|'awayScore',value:number){
-    if(!draft||!Number.isInteger(value)||value<0||value>30)return;
-    const teamId=side==='homeScore'?draft.homeId:draft.awayId;
-    const current=draft.goals.filter(g=>g.teamId===teamId).slice(0,value);
-    while(current.length<value)current.push({teamId,scorerId:null,assistId:null,ownGoal:false});
-    setDraft({...draft,[side]:value,goals:[...draft.goals.filter(g=>g.teamId!==teamId),...current]});
+  function addGoal(teamId:string){
+    if(!draft)return;
+    const side=teamId===draft.homeId?'homeScore':'awayScore';
+    if(draft[side]>=30)return;
+    setDraft({...draft,[side]:draft[side]+1,goals:[...draft.goals,{teamId,scorerId:null,assistId:null,ownGoal:false}]});
+  }
+  function removeGoal(index:number){
+    if(!draft)return;const goal=draft.goals[index],side=goal.teamId===draft.homeId?'homeScore':'awayScore';
+    setDraft({...draft,[side]:draft[side]-1,goals:draft.goals.filter((_,i)=>i!==index)});
   }
   function changeGoal(index:number,change:Partial<Goal>){if(draft)setDraft({...draft,goals:draft.goals.map((g,i)=>i===index?{...g,...change}:g)});}
   async function save(){
     if(!draft||busy)return;
     setBusy(true);setNotice('');
-    try{await changePelada(number,{action:'saveMatch',match:draft,etag:version});setDraft(null);setNotice(isNewMatch?'Partida criada! Adicione o resultado, os gols e as assistências quando quiser.':'Partida salva. Estatísticas atualizadas!');await refresh();}
+    try{await changePelada(number,{action:'saveMatch',match:draft,etag:version});setDraft(null);setNotice(isNewMatch?'Partida criada! Use Adicionar gol para atualizar durante o jogo.':'Partida salva. Estatísticas atualizadas!');await refresh();}
     catch(e){setNotice((e as Error).message);await refresh();}
     finally{setBusy(false);}
   }
@@ -55,9 +60,9 @@ export default function PublicPeladaPage({number}:{number:number}){
             <fieldset disabled={busy}><legend>{isNewMatch?'Times da partida':'Times e resultado'}</legend><div className="match-grid">
               <label>Time A<select value={draft.homeId} onChange={e=>setDraft({...draft,homeId:e.target.value,homeScore:0,awayScore:0,goals:[]})}>{data.teams.map(t=><option key={t.id} value={t.id} disabled={t.id===draft.awayId}>{t.name}</option>)}</select></label>
               <label>Time B<select value={draft.awayId} onChange={e=>setDraft({...draft,awayId:e.target.value,homeScore:0,awayScore:0,goals:[]})}>{data.teams.map(t=><option key={t.id} value={t.id} disabled={t.id===draft.homeId}>{t.name}</option>)}</select></label>
-            </div>{!isNewMatch&&<label>Situação<select value={draft.status} onChange={e=>setDraft({...draft,status:e.target.value as Match['status'],...(e.target.value==='scheduled'?{homeScore:0,awayScore:0,goals:[]}: {})})}><option value="finished">Finalizada</option><option value="scheduled">A jogar</option></select></label>}
-            {!isNewMatch&&draft.status==='finished'&&<><div className="match-grid"><label>Gols do {teamName(draft.homeId)}<input type="number" min={0} max={30} value={draft.homeScore} onChange={e=>score('homeScore',Number(e.target.value))}/></label><label>Gols do {teamName(draft.awayId)}<input type="number" min={0} max={30} value={draft.awayScore} onChange={e=>score('awayScore',Number(e.target.value))}/></label></div>
-              {draft.goals.map((g,i)=>{const members=data.players.filter(p=>data.teams.find(t=>t.id===g.teamId)?.playerIds.includes(p.id));return <div className="goal-entry" key={i}><strong>{teamName(g.teamId)} · Gol {draft.goals.slice(0,i+1).filter(x=>x.teamId===g.teamId).length}</strong><div className="match-grid">
+            </div>
+            {!isNewMatch&&<><div className="live-score" aria-label="Placar atual"><strong>{teamName(draft.homeId)} {draft.homeScore} × {draft.awayScore} {teamName(draft.awayId)}</strong></div><div className="match-grid">{[draft.homeId,draft.awayId].map(id=><button type="button" className="button primary" key={id} disabled={(id===draft.homeId?draft.homeScore:draft.awayScore)>=30} onClick={()=>addGoal(id)}>+ Gol · {teamName(id)}</button>)}</div>
+              {draft.goals.map((g,i)=>{const members=data.players.filter(p=>data.teams.find(t=>t.id===g.teamId)?.playerIds.includes(p.id));return <div className="goal-entry" key={i}><strong>{teamName(g.teamId)} · Gol {draft.goals.slice(0,i+1).filter(x=>x.teamId===g.teamId).length}</strong><button type="button" className="button subtle" aria-label={`Remover gol ${i+1}`} onClick={()=>removeGoal(i)}>Remover gol</button><div className="match-grid">
                 <label>Quem fez o gol {i+1}<select aria-label={`Quem fez o gol ${i+1}`} value={g.ownGoal?'own':g.scorerId||''} onChange={e=>changeGoal(i,{scorerId:e.target.value==='own'?null:e.target.value||null,ownGoal:e.target.value==='own',assistId:null})}><option value="">Selecione o jogador</option>{members.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}<option value="own">Gol contra do adversário</option></select></label>
                 <label>Assistência do gol {i+1}<select aria-label={`Assistência do gol ${i+1}`} disabled={g.ownGoal||!g.scorerId} value={g.assistId||''} onChange={e=>changeGoal(i,{assistId:e.target.value||null})}><option value="">Sem assistência</option>{members.filter(p=>p.id!==g.scorerId).map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
               </div></div>;})}
@@ -66,10 +71,10 @@ export default function PublicPeladaPage({number}:{number:number}){
             <div className="button-row"><button className="button subtle" onClick={()=>void confirm('Descartar esta edição?').then(ok=>{if(ok)setDraft(null);})}>{isNewMatch?'Cancelar':'Cancelar edição'}</button><button className="button primary" disabled={version!==data.etag||draft.goals.some(g=>!g.ownGoal&&!g.scorerId)} onClick={()=>void save()}>{busy?'Salvando…':isNewMatch?'Criar partida':'Salvar partida'}</button></div></fieldset>
           </section>}
           {notice&&<div className="panel" role="status">{notice}</div>}
-          <section aria-label="Histórico de partidas">{!data.matches.length?<div className="panel"><p>Nenhuma partida registrada.</p></div>:[...data.matches].reverse().map((m,i)=><article key={m.id} className="panel match-card"><div className="panel-heading"><span className="eyebrow">PARTIDA {data.matches.length-i} · {m.status==='finished'?'FINALIZADA':'A JOGAR'}</span><button className="button subtle" disabled={busy} onClick={()=>void edit(m)}>{m.status==='scheduled'?'Adicionar resultado':'Editar'}</button></div><h3>{teamName(m.homeId)} <span>{m.status==='finished'?`${m.homeScore} × ${m.awayScore}`:'×'}</span> {teamName(m.awayId)}</h3>{m.goals.map((g,j)=><p key={j} className="match-event">⚽ {g.ownGoal?`Gol contra a favor do ${teamName(g.teamId)}`:data.players.find(p=>p.id===g.scorerId)?.name}{g.assistId?` · Assistência: ${data.players.find(p=>p.id===g.assistId)?.name}`:''}</p>)}</article>)}</section>
+          <section aria-label="Histórico de partidas">{!data.matches.length?<div className="panel"><p>Nenhuma partida registrada.</p></div>:[...data.matches].reverse().map((m,i)=><article key={m.id} className="panel match-card"><div className="panel-heading"><span className="eyebrow">PARTIDA {data.matches.length-i}</span><button className="button subtle" disabled={busy} onClick={()=>void edit(m)}>Editar</button></div><h3>{teamName(m.homeId)} <span>{`${m.homeScore} × ${m.awayScore}`}</span> {teamName(m.awayId)}</h3><div className="match-grid">{[m.homeId,m.awayId].map(id=><button className="button primary" key={id} disabled={busy||(id===m.homeId?m.homeScore:m.awayScore)>=30} onClick={()=>void edit(m,id)}>+ Gol · {teamName(id)}</button>)}</div>{m.goals.map((g,j)=><p key={j} className="match-event">⚽ {g.ownGoal?`Gol contra a favor do ${teamName(g.teamId)}`:data.players.find(p=>p.id===g.scorerId)?.name}{g.assistId?` · Assistência: ${data.players.find(p=>p.id===g.assistId)?.name}`:''}</p>)}</article>)}</section>
         </>:tab==='summary'?<>
           <div className="stat-grid"><div className="stat"><div className="stat-label">Time líder</div><strong className="leader-name">{leaders}</strong></div><div className="stat"><div className="stat-label">Artilheiro</div><strong className="leader-name">{top('goals')}</strong></div><div className="stat"><div className="stat-label">Garçom</div><strong className="leader-name">{top('assists')}</strong></div></div>
-          <section className="panel"><h3>Classificação dos times</h3><p className="hint">Vitória: 3 pontos · Empate: 1 ponto. Desempate: saldo de gols e gols marcados. Empates restantes são compartilhados.</p><div className="table-scroll"><table><caption className="sr-only">Estatísticas dos times</caption><thead><tr>{['Time','PTS','J','V','E','D','GP','GC','SG'].map(h=><th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{summary!.table.map(t=><tr key={t.id}><th scope="row">{t.name}</th>{[t.points,t.played,t.wins,t.draws,t.losses,t.goalsFor,t.goalsAgainst,t.balance].map((n,i)=><td key={i}>{n}</td>)}</tr>)}</tbody></table></div><p className="hint">J: jogos · V: vitórias · E: empates · D: derrotas · GP: gols pró · GC: gols contra · SG: saldo.</p></section>
+          <section className="panel"><h3>Classificação dos times</h3><p className="hint">Vitória: 3 pontos · Empate: 1 ponto. Resultados parciais contam durante o jogo. Desempate: saldo de gols e gols marcados. Empates restantes são compartilhados.</p><div className="table-scroll"><table><caption className="sr-only">Estatísticas dos times</caption><thead><tr>{['Time','PTS','J','V','E','D','GP','GC','SG'].map(h=><th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{summary!.table.map(t=><tr key={t.id}><th scope="row">{t.name}</th>{[t.points,t.played,t.wins,t.draws,t.losses,t.goalsFor,t.goalsAgainst,t.balance].map((n,i)=><td key={i}>{n}</td>)}</tr>)}</tbody></table></div><p className="hint">J: jogos · V: vitórias · E: empates · D: derrotas · GP: gols pró · GC: gols contra · SG: saldo.</p></section>
           <section className="panel"><h3>Ranking dos jogadores</h3><div className="mode-buttons" aria-label="Ranking individual"><button className={ranking==='goals'?'active':''} onClick={()=>setRanking('goals')}>Gols</button><button className={ranking==='assists'?'active':''} onClick={()=>setRanking('assists')}>Assistências</button></div>{ranked.map(p=><div className="ranking-result" key={p.id}><span>{p.name}</span><strong>{p[ranking]} {ranking==='goals'?(p[ranking]===1?'gol':'gols'):(p[ranking]===1?'assistência':'assistências')}</strong></div>)}</section>
         </>:<section className="panel" aria-labelledby="public-teams-title"><h3 id="public-teams-title">Times da pelada</h3><p className="hint">Confira seu time e quem joga com você.</p><div className="public-rosters">{data.teams.map(t=><article className="public-team" key={t.id}><h4>{t.name}</h4><p>{t.playerIds.length} jogadores</p><ul>{t.playerIds.map(id=><li key={id}>{data.players.find(p=>p.id===id)?.name||'Jogador indisponível'}</li>)}</ul></article>)}</div></section>}
       </>}
