@@ -161,7 +161,8 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   };
   const deletePelada=async(number:number)=>{
     const pelada=state?.peladas.find(p=>p.number===number);
-    if((!pelada&&!state?.pendingDeletions?.includes(number))||savingRef.current)return;
+    if(savingRef.current){showMessage('Aguarde a operação atual terminar antes de excluir.');return;}
+    if(!pelada&&!state?.pendingDeletions?.includes(number)){showMessage('Esta pelada não está mais na lista. Atualize os dados para continuar.');return;}
     if(!await confirm(`Excluir a Pelada ${number}? O histórico desta pelada será removido. O Ranking Geral será mantido. Esta ação não pode ser desfeita.`))return;
     savingRef.current=true;setSaving(true);setFeedback('');
     try{
