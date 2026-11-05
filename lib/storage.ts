@@ -21,7 +21,9 @@ async function localRead(path:string):Promise<Document|null>{
 export async function readDocument(path:string):Promise<Document|null>{
   if(!useBlob)return localRead(path);
   ensureConfiguration();
-  const doc=await get(path,{access:'private',useCache:false});
+  // If-Match needs the storage ETag, not a weak validator from gzip delivery.
+  // Read bytes and version together; never strip W/ or fetch metadata separately.
+  const doc=await get(path,{access:'private',useCache:false,headers:{'Accept-Encoding':'identity'}});
   if(!doc || !doc.stream)return null;
   const content=await new Response(doc.stream).text();
   return {content,etag:doc.blob.etag};
