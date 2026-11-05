@@ -50,14 +50,36 @@ it('prevents selecting the same team twice and cancels creation without saving',
 it('adds a goal from the match card, saves its scorer, and corrects it through Edit',async()=>{
  await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);
  await click('+ Gol · Time 1',document.querySelector('.match-card')!);
- let editor=document.querySelector('.match-editor')!;
- const scorer=editor.querySelector<HTMLSelectElement>('select[aria-label="Quem fez o gol 1"]')!;
+ expect(document.querySelector('.match-editor')).toBeNull();
+ let editor=document.querySelector('.quick-goal')!;
+ expect(editor.querySelectorAll('select')).toHaveLength(2);
+ const scorer=editor.querySelector<HTMLSelectElement>('select')!;
  expect(scorer).not.toBeNull();
  await act(async()=>{scorer.value='a';scorer.dispatchEvent(new Event('change',{bubbles:true}));});
- await click('Salvar partida',editor);
+ await click('Salvar gol',editor);
  expect(game.matches[0].homeScore).toBe(1);expect(game.matches[0].goals[0].scorerId).toBe('a');
  await click('Editar');editor=document.querySelector('.match-editor')!;
  await click('Remover gol',editor);await click('Salvar partida',editor);
  expect(game.matches[0].homeScore).toBe(0);expect(game.matches[0].goals).toEqual([]);
  expect(game.matches).toHaveLength(1);
+});
+
+it('cancels a quick goal without changing the score or sending a write',async()=>{
+ await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);
+ const writes=api.changePelada.mock.calls.length;
+ await click('+ Gol · Time 1',document.querySelector('.match-card')!);
+ await click('Cancelar',document.querySelector('.quick-goal')!);
+ expect(api.changePelada.mock.calls).toHaveLength(writes);expect(game.matches[0].homeScore).toBe(0);
+ expect(document.querySelector('.quick-goal')).toBeNull();
+});
+it('keeps a failed quick goal visible and blocks a stale update instead of overwriting another score',async()=>{
+ await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);
+ await click('+ Gol · Time 1',document.querySelector('.match-card')!);
+ const scorer=document.querySelector<HTMLSelectElement>('.quick-goal select')!;
+ await act(async()=>{scorer.value='a';scorer.dispatchEvent(new Event('change',{bubbles:true}));});
+ api.changePelada.mockImplementationOnce(async()=>{game.etag='version-3';throw new Error('Outro jogador atualizou o placar.');});
+ await click('Salvar gol',document.querySelector('.quick-goal')!);
+ expect(document.querySelector('.quick-goal')?.textContent).toContain('Outro jogador');
+ const save=Array.from(document.querySelectorAll<HTMLButtonElement>('.quick-goal button')).find(b=>b.textContent==='Salvar gol')!;
+ expect(save.disabled).toBe(true);expect(game.matches[0].homeScore).toBe(0);
 });

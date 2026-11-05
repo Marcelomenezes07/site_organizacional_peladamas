@@ -7,18 +7,35 @@ export default function PublicPeladaPage({number}:{number:number}){
   const [data,setData]=useState<PublicPelada|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
   const [tab,setTab]=useState<'update'|'summary'|'teams'>('update'),[ranking,setRanking]=useState<'goals'|'assists'>('goals');
   const [draft,setDraft]=useState<Match|null>(null),[version,setVersion]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
+  const [quickGoal,setQuickGoal]=useState<{match:Match;teamId:string;etag:string;scorer:string;assist:string;error:string}|null>(null);
   const {confirm,confirmation}=useConfirmation();
   const refresh=useCallback(async()=>{try{setData(await getPelada(number));setError('');}catch(e){if(e instanceof PeladaError&&e.status===404)setData(null);setError((e as Error).message);}finally{setLoading(false);}},[number]);
   useEffect(()=>{void refresh();const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},12000);const visible=()=>{if(document.visibilityState==='visible')void refresh();};document.addEventListener('visibilitychange',visible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[refresh]);
   const summary=data?summarize(data,data.players):null;
   const teamName=(id:string)=>data?.teams.find(t=>t.id===id)?.name||id;
-  async function edit(match?:Match,goalTeam?:string){
+  async function edit(match?:Match){
     if(!data)return;
     if(draft&&!await confirm('Descartar a edição atual para abrir outra partida?'))return;
     const next:Match=match?{...structuredClone(match),status:'finished'}:{id:crypto.randomUUID(),homeId:data.teams[0].id,awayId:data.teams[1].id,status:'finished',homeScore:0,awayScore:0,goals:[]};
-    if(goalTeam){if(next.homeScore+next.awayScore>=60)return;const side=goalTeam===next.homeId?'homeScore':'awayScore';if(next[side]>=30)return;next[side]++;next.goals.push({teamId:goalTeam,scorerId:null,assistId:null,ownGoal:false});}
-    setDraft(next);
+    setQuickGoal(null);setDraft(next);
     setVersion(data.etag);setNotice('');setTab('update');
+  }
+  async function openQuickGoal(match:Match,teamId:string){
+    if(!data||busy)return;
+    if(draft&&!await confirm('Descartar a edição atual para adicionar este gol?'))return;
+    setDraft(null);setNotice('');
+    setQuickGoal({match:structuredClone(match),teamId,etag:data.etag,scorer:'',assist:'',error:''});
+  }
+  async function saveQuickGoal(){
+    if(!quickGoal||!quickGoal.scorer||busy)return;
+    const q=quickGoal,side=q.teamId===q.match.homeId?'homeScore':'awayScore';
+    if(q.match[side]>=30)return;
+    const ownGoal=q.scorer==='own';
+    const match:Match={...q.match,status:'finished',[side]:q.match[side]+1,goals:[...q.match.goals,{teamId:q.teamId,scorerId:ownGoal?null:q.scorer,assistId:ownGoal?null:q.assist||null,ownGoal}]};
+    setBusy(true);
+    try{await changePelada(number,{action:'saveMatch',match,etag:q.etag});setQuickGoal(null);setNotice('Gol adicionado. Placar e estatísticas atualizados!');await refresh();}
+    catch(e){setQuickGoal(current=>current?{...current,error:(e as Error).message}:null);await refresh();}
+    finally{setBusy(false);}
   }
   function addGoal(teamId:string){
     if(!draft)return;
@@ -71,7 +88,16 @@ export default function PublicPeladaPage({number}:{number:number}){
             <div className="button-row"><button className="button subtle" onClick={()=>void confirm('Descartar esta edição?').then(ok=>{if(ok)setDraft(null);})}>{isNewMatch?'Cancelar':'Cancelar edição'}</button><button className="button primary" disabled={version!==data.etag||draft.goals.some(g=>!g.ownGoal&&!g.scorerId)} onClick={()=>void save()}>{busy?'Salvando…':isNewMatch?'Criar partida':'Salvar partida'}</button></div></fieldset>
           </section>}
           {notice&&<div className="panel" role="status">{notice}</div>}
-          <section aria-label="Histórico de partidas">{!data.matches.length?<div className="panel"><p>Nenhuma partida registrada.</p></div>:[...data.matches].reverse().map((m,i)=><article key={m.id} className="panel match-card"><div className="panel-heading"><span className="eyebrow">PARTIDA {data.matches.length-i}</span><button className="button subtle" disabled={busy} onClick={()=>void edit(m)}>Editar</button></div><h3>{teamName(m.homeId)} <span>{`${m.homeScore} × ${m.awayScore}`}</span> {teamName(m.awayId)}</h3><div className="match-grid">{[m.homeId,m.awayId].map(id=><button className="button primary" key={id} disabled={busy||(id===m.homeId?m.homeScore:m.awayScore)>=30} onClick={()=>void edit(m,id)}>+ Gol · {teamName(id)}</button>)}</div>{m.goals.map((g,j)=><p key={j} className="match-event">⚽ {g.ownGoal?`Gol contra a favor do ${teamName(g.teamId)}`:data.players.find(p=>p.id===g.scorerId)?.name}{g.assistId?` · Assistência: ${data.players.find(p=>p.id===g.assistId)?.name}`:''}</p>)}</article>)}</section>
+          <section aria-label="Histórico de partidas">{!data.matches.length?<div className="panel"><p>Nenhuma partida registrada.</p></div>:[...data.matches].reverse().map((m,i)=><article key={m.id} className="panel match-card"><div className="panel-heading"><span className="eyebrow">PARTIDA {data.matches.length-i}</span><button className="button subtle" disabled={busy} onClick={()=>void edit(m)}>Editar</button></div><h3>{teamName(m.homeId)} <span>{`${m.homeScore} × ${m.awayScore}`}</span> {teamName(m.awayId)}</h3><div className="match-grid">{[m.homeId,m.awayId].map(id=><button className="button primary" key={id} disabled={busy||(id===m.homeId?m.homeScore:m.awayScore)>=30} onClick={()=>void openQuickGoal(m,id)}>+ Gol · {teamName(id)}</button>)}</div>{quickGoal?.match.id===m.id&&<form className="quick-goal" aria-label="Adicionar gol" onSubmit={e=>{e.preventDefault();void saveQuickGoal();}}>
+            <h4>Gol do {teamName(quickGoal.teamId)}</h4>
+            <fieldset disabled={busy}><div className="match-grid">
+              <label>De quem foi o gol?<select aria-label="De quem foi o gol?" required value={quickGoal.scorer} onChange={e=>setQuickGoal({...quickGoal,scorer:e.target.value,assist:''})}><option value="">Selecione o jogador</option>{data.players.filter(p=>data.teams.find(t=>t.id===quickGoal.teamId)?.playerIds.includes(p.id)).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}<option value="own">Gol contra do adversário</option></select></label>
+              <label>De quem foi a assistência?<select aria-label="De quem foi a assistência?" disabled={!quickGoal.scorer||quickGoal.scorer==='own'} value={quickGoal.assist} onChange={e=>setQuickGoal({...quickGoal,assist:e.target.value})}><option value="">Sem assistência</option>{data.players.filter(p=>p.id!==quickGoal.scorer&&data.teams.find(t=>t.id===quickGoal.teamId)?.playerIds.includes(p.id)).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+            </div>
+            {quickGoal.error&&<p role="alert" className="error-text">{quickGoal.error}</p>}
+            {quickGoal.etag!==data.etag&&<p role="alert" className="error-text">A pelada mudou. Cancele e abra Adicionar gol novamente para usar o placar atualizado.</p>}
+            <div className="button-row"><button type="button" className="button subtle" onClick={()=>setQuickGoal(null)}>Cancelar</button><button type="submit" className="button primary" disabled={!quickGoal.scorer||quickGoal.etag!==data.etag}>{busy?'Salvando…':'Salvar gol'}</button></div></fieldset>
+          </form>}{m.goals.map((g,j)=><p key={j} className="match-event">⚽ {g.ownGoal?`Gol contra a favor do ${teamName(g.teamId)}`:data.players.find(p=>p.id===g.scorerId)?.name}{g.assistId?` · Assistência: ${data.players.find(p=>p.id===g.assistId)?.name}`:''}</p>)}</article>)}</section>
         </>:tab==='summary'?<>
           <div className="stat-grid"><div className="stat"><div className="stat-label">Time líder</div><strong className="leader-name">{leaders}</strong></div><div className="stat"><div className="stat-label">Artilheiro</div><strong className="leader-name">{top('goals')}</strong></div><div className="stat"><div className="stat-label">Garçom</div><strong className="leader-name">{top('assists')}</strong></div></div>
           <section className="panel"><h3>Classificação dos times</h3><p className="hint">Vitória: 3 pontos · Empate: 1 ponto. Resultados parciais contam durante o jogo. Desempate: saldo de gols e gols marcados. Empates restantes são compartilhados.</p><div className="table-scroll"><table><caption className="sr-only">Estatísticas dos times</caption><thead><tr>{['Time','PTS','J','V','E','D','GP','GC','SG'].map(h=><th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{summary!.table.map(t=><tr key={t.id}><th scope="row">{t.name}</th>{[t.points,t.played,t.wins,t.draws,t.losses,t.goalsFor,t.goalsAgainst,t.balance].map((n,i)=><td key={i}>{n}</td>)}</tr>)}</tbody></table></div><p className="hint">J: jogos · V: vitórias · E: empates · D: derrotas · GP: gols pró · GC: gols contra · SG: saldo.</p></section>
