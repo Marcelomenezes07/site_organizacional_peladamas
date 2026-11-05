@@ -99,4 +99,4 @@ Excluir uma pelada remove o CSV e os JSONs de suas revisões. O número fica res
 
 As alterações devem ser enviadas primeiro ao GitHub para teste local. Deploy na Vercel somente após autorização explícita do responsável, usando a versão atual do GitHub.
 
-A página pública de cada pelada tem três abas: Atualizar pelada, Resumo e Times. Em Times, cada equipe mostra sua lista de jogadores.
+A página pública de cada pelada tem três abas: Atualizar pelada, Resumo e Times. Em Times, cada equipe mostra sua lista de jogadores. 
