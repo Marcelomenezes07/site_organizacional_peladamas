@@ -1,5 +1,5 @@
 import {randomUUID} from 'node:crypto';
-import {readDocument,createDocument,updateDocument,ConflictError} from './storage.js';
+import {readDocument,createDocument,updateDocument,deleteDocument,ConflictError} from './storage.js';
 import {readCsv,peladaToCsv} from './csv.js';
 import {summarize,validateMatch,type MatchState,type SavedTeam} from './matches.js';
 
@@ -46,7 +46,8 @@ export async function handlePublicPelada(method:string,number:number,payload:unk
     // Immutable snapshot first; the CSV pointer and totals commit atomically with its ETag.
     const matchFile=`partidas/pelada_${number}_${randomUUID()}.json`;
     await createDocument(matchFile,JSON.stringify(next));
-    await updateDocument(path,peladaToCsv({...parsed,players,matchFile}),doc.etag);
+    try{await updateDocument(path,peladaToCsv({...parsed,players,matchFile}),doc.etag);}
+    catch(e){try{await deleteDocument(matchFile);}catch(cleanup){console.error('Revisão não publicada pendente de limpeza',cleanup);}throw e;}
     return reply(200,{ok:true});
   }catch(e){
     if(e instanceof ConflictError)return reply(409,{error:e.message});

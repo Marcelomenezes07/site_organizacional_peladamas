@@ -1,3 +1,4 @@
+import {getPelada,changePelada} from './pelada-api';
 import PeladaLinks from './PeladaLinks';
 import { useConfirmation } from './useConfirmation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -160,11 +161,11 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   };
   const deletePelada=async(number:number)=>{
     const pelada=state?.peladas.find(p=>p.number===number);
-    if(!pelada||savingRef.current)return;
+    if((!pelada&&!state?.pendingDeletions?.includes(number))||savingRef.current)return;
     if(!await confirm(`Excluir a Pelada ${number}? O histórico desta pelada será removido. O Ranking Geral será mantido. Esta ação não pode ser desfeita.`))return;
     savingRef.current=true;setSaving(true);setFeedback('');
     try{
-      await remote('POST',{action:'deletePelada',number,etag:pelada.etag});
+      await remote('POST',{action:'deletePelada',number,etag:pelada?.etag});
       if(currentViewRef.current===String(number)){
         currentViewRef.current='geral';setView('geral');setDirty(false);dirtyRef.current=false;
       }
@@ -175,12 +176,18 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   };
   const activePelada:Pelada|undefined=state?.peladas.find(p=>p.number===(sourceNumber??state.peladas[0]?.number))||state?.peladas[0];
   const selectPelada=(value:number)=>{setSourceNumber(value);setTeams(null);setCopied(false);};
-  const drawTeams=()=>{
-    if(!activePelada)return;
+  const drawTeams=async()=>{
+    if(!activePelada||savingRef.current)return;
+    savingRef.current=true;setSaving(true);setFeedback('');
     try{
+      const published=await getPelada(activePelada.number);
+      if(published.matches.length)throw new Error('Os times não podem mudar porque já existem partidas registradas.');
+      if(published.teams.length&&!await confirm('Sortear novamente e substituir os times publicados desta pelada?'))return;
       const result=sortTeams(activePelada.players,perTeam,drawMode);
-      setTeams(result);setCopied(false);setFeedback('');
+      await changePelada(activePelada.number,{action:'publishTeams',teams:result.map(t=>t.map(p=>p.id)),etag:published.etag});
+      setTeams(result);setCopied(false);setFeedback('Times sorteados e salvos na página pública. Você já pode copiar o link!');
     }catch(e){showMessage((e as Error).message);}
+    finally{savingRef.current=false;setSaving(false);await refresh();}
   };
   const copyTeams=async()=>{
     if(!teams||!activePelada)return;
@@ -214,6 +221,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
         <button type="button" onClick={()=>{setTab('sorteio');setFeedback('');}} className={'tab '+(tab==='sorteio'?'selected':'')}><Shuffle size={18}/> Sortear times</button>
       </nav>
 
+      {!!state?.pendingDeletions?.length&&<div className="panel"><h3>Arquivos com exclusão pendente</h3><p>Estas peladas já estão desativadas. Conclua a remoção dos arquivos antigos.</p>{state.pendingDeletions.map(number=><button key={number} className="button danger" disabled={saving} onClick={()=>void deletePelada(number)}>Concluir exclusão da Pelada {number}</button>)}</div>}
       {loading?<div className="loading-screen"><LoaderCircle size={30} className="spinner"/><p>Carregando rankings...</p></div>:
       !state?<div className="panel"><Empty icon={<CloudOff size={28}/>} heading="Não foi possível acessar os dados" detail="Confira se a API está funcionando e se o armazenamento foi configurado."/><button className="button primary full" onClick={()=>void refresh(true)}>Tentar novamente</button>{feedback&&<p className="error-text">{feedback}</p>}</div>:
       tab==='ranking'?<>
@@ -226,7 +234,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           <div className="hint"><Info size={15}/>{view==='geral'?'Notas principais. Peladas novas começam com este ranking.':'Histórico independente: mudar estas estrelas não altera o ranking geral.'}</div>
           {view!=='geral'&&<button className="button danger" disabled={saving} onClick={()=>void deletePelada(Number(view))}><Trash2 size={16}/> Excluir Pelada {view}</button>}
         </div>
-        {view!=='geral'&&<PeladaLinks key={view} number={Number(view)} onSaved={()=>void refresh()}/>}
+        {view!=='geral'&&<PeladaLinks key={view} number={Number(view)} version={state.peladas.find(p=>p.number===Number(view))?.etag}/>}
         <div className="stat-grid">
           <div className="stat"><div className="stat-icon"><Users size={18}/></div><div className="stat-number">{draft.length}</div><div className="stat-label">Jogadores</div></div>
           <div className="stat"><div className="stat-icon"><Sparkles size={18}/></div><div className="stat-number">{formatStars(rankAvg)}</div><div className="stat-label">Média de estrelas</div></div>
@@ -280,7 +288,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           </div>}
         </>:<>
           {!activePelada?<div className="panel"><Empty icon={<FilePlus2 size={28}/>} heading="Ainda não há peladas" detail="Crie a primeira pelada colando a lista do WhatsApp."/><button className="button primary full" onClick={()=>setMode('criar')}><Plus size={17}/> Criar primeira pelada</button></div>:<>
-            <PeladaLinks key={activePelada.number} number={activePelada.number} teams={teams} onSaved={()=>void refresh()}/>
+            <PeladaLinks key={activePelada.number} number={activePelada.number} version={activePelada.etag}/>
             <div className="panel selector-card"><label className="form-label" htmlFor="sourceSelect">Escolha a pelada</label><div className="select-wrap"><select id="sourceSelect" className="main-select" value={activePelada.number} onChange={e=>selectPelada(Number(e.target.value))}>{state.peladas.map((p,i)=><option key={p.number} value={p.number}>{i===0?'Última — ':''}Pelada {p.number} · {p.players.length} jogadores</option>)}</select><ChevronDown size={17}/></div>
             <div className="hint"><History size={15}/> As estrelas usadas serão as salvas no histórico desta pelada.</div><button className="button danger" disabled={saving} onClick={()=>void deletePelada(activePelada.number)}><Trash2 size={16}/> Excluir Pelada {activePelada.number}</button></div>
             <div className="stat-grid"><div className="stat"><div className="stat-icon"><Users size={18}/></div><div className="stat-number">{activePelada.players.length}</div><div className="stat-label">Convocados</div></div><div className="stat"><div className="stat-icon"><Trophy size={18}/></div><div className="stat-number">{Math.max(2,Math.ceil(activePelada.players.length/perTeam))}</div><div className="stat-label">Times</div></div><div className="stat"><div className="stat-icon"><Sparkles size={18}/></div><div className="stat-number">{formatStars(activePelada.players.reduce((s,p)=>s+p.stars,0))}</div><div className="stat-label">Total de estrelas</div></div></div>
@@ -292,7 +300,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
               <div className="setting-row"><label htmlFor="sizeInput">Jogadores por time</label><div className="select-wrap small"><select id="sizeInput" value={perTeam} onChange={e=>{setPerTeam(Number(e.target.value));setTeams(null);}}>{[4,5,6,7,8,9,10,11].map(n=><option key={n} value={n}>{n}</option>)}</select><ChevronDown size={15}/></div></div>
               <div className="draw-mode"><label className="form-label" htmlFor="drawMode">Como equilibrar os times</label><select id="drawMode" className="main-select" value={drawMode} onChange={e=>{setDrawMode(e.target.value as DrawMode);setTeams(null);}}><option value="balanced">Equilíbrio geral (recomendado)</option><option value="tiers">Por faixas de habilidade</option></select><p className="hint">{drawMode==='balanced'?'Busca médias próximas e distribui os jogadores mais fortes entre os times.':'Dá mais peso à distribuição das faixas: até 2, de 2,5 a 3,5 e de 4 a 5 estrelas, mantendo as médias próximas.'}</p></div>
               <div className="hint"><Info size={15}/> Considera apenas os convocados, sem regras fixas por nome. Todos participam; se sobrarem jogadores, os times terão tamanhos diferentes e o equilíbrio será calculado pela média.</div>
-              <button className="button primary full big-sort" onClick={drawTeams}><Shuffle size={19}/> {teams?'Sortear novamente':'Sortear times'}</button>
+              <button className="button primary full big-sort" disabled={saving} onClick={()=>void drawTeams()}><Shuffle size={19}/> {saving?'Salvando sorteio…':teams?'Sortear novamente':'Sortear times'}</button><p className="hint">Ao sortear, os times são salvos automaticamente na página pública.</p>
             </div>
             {teams&&<div className="results"><div className="results-heading"><div><span className="eyebrow">RESULTADO DO SORTEIO</span><h3>Times da Pelada {activePelada.number}</h3></div><span className="result-tag"><CheckCircle2 size={14}/> {drawMode==='balanced'?'Equilíbrio geral':'Por faixas'}</span></div>
               <p className="hint">Diferença entre médias: {formatStars(Math.max(...teams.map(t=>teamTotal(t)/t.length))-Math.min(...teams.map(t=>teamTotal(t)/t.length)))} ★ · O resultado depende das notas informadas.</p><div className="teams-grid">{teams.map((team,i)=><div className="team-card" key={i}><div className="team-head"><strong><span>{teamEmojis[i%teamEmojis.length]}</span> TIME {i+1}</strong><span>{formatStars(teamTotal(team))} ⭐</span></div><div className="team-body">{team.map((p,j)=><div className="team-member" key={p.id}><span><small>{String(j+1).padStart(2,'0')}</small>{p.name}</span><em>{formatStars(p.stars)}</em></div>)}</div><div className="team-footer">Média: <strong>{formatStars(teamTotal(team)/team.length)} ⭐</strong></div></div>)}</div>

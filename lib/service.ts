@@ -2,7 +2,7 @@ import {readMatchState} from './public-pelada.js';
 import { readCsv, rankingToCsv, peladaToCsv } from './csv.js';
 import { starterPlayers, type AppState, type Pelada, type Player, type Ranking } from './models.js';
 import { validStars, normalize, matchPlayer } from './logic.js';
-import { readDocument, listDocuments, createDocument, updateDocument, ConflictError } from './storage.js';
+import { readDocument, listDocuments, createDocument, updateDocument, deleteDocument, ConflictError } from './storage.js';
 
 const rankPath='ranking_geral.csv';
 const peladaPath=(n:number)=>`peladas/pelada_${n}.csv`;
@@ -38,10 +38,15 @@ async function peladas():Promise<Pelada[]>{
   }));
   return docs.filter(x=>x!==null).sort((a,b)=>b.number-a.number);
 }
+async function usedPeladaNumbers(){
+  const groups=await Promise.all([listDocuments('peladas/'),listDocuments('excluidas/')]);
+  return groups.flat().map(path=>Number(path.match(/pelada_(\d+)\.(?:csv|json)$/)?.[1]||0));
+}
 async function getState():Promise<AppState>{
-  const [r,p,paths]=await Promise.all([ranking(),peladas(),listDocuments('peladas/')]);
-  const nextPeladaNumber=Math.max(0,...paths.map(path=>Number(path.match(/pelada_(\d+)\.csv$/)?.[1]||0)))+1;
-  return {ranking:r,peladas:p,nextPeladaNumber};
+  const [r,p,ids,paths]=await Promise.all([ranking(),peladas(),usedPeladaNumbers(),listDocuments('peladas/')]);
+  const pending=await Promise.all(paths.filter(path=>/^peladas\/pelada_\d+\.csv$/.test(path)).map(async path=>(await readDocument(path))?.content===deletedMarker?Number(path.match(/pelada_(\d+)/)![1]):null));
+  const nextPeladaNumber=Math.max(0,...ids)+1;
+  return {ranking:r,peladas:p,nextPeladaNumber,pendingDeletions:pending.filter((n):n is number=>n!==null)};
 }
 async function addToRanking(players:Player[]):Promise<number>{
   if(!players.length)return 0;
@@ -77,10 +82,20 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
       const number=Number(data.number);
       if(!Number.isSafeInteger(number)||number<1)return output(400,{error:'Pelada inválida.'});
       const path=peladaPath(number),doc=await readDocument(path);
-      if(!doc||doc.content===deletedMarker)return output(404,{error:'Pelada não encontrada.'});
-      if(typeof data.etag!=='string'||data.etag!==doc.etag)throw new ConflictError();
-      // Keep only the number reserved, with no player data, so old links cannot refer to a new game.
-      await updateDocument(path,deletedMarker,doc.etag);
+      if(!doc)return output(404,{error:'Pelada não encontrada.'});
+      if(doc.content!==deletedMarker&&(typeof data.etag!=='string'||data.etag!==doc.etag))throw new ConflictError();
+      const reservation=`excluidas/pelada_${number}.json`;
+      if(!await readDocument(reservation)){
+        try{await createDocument(reservation,JSON.stringify({number}));}catch(e){if(!(e instanceof ConflictError))throw e;}
+      }
+      if(doc.content!==deletedMarker)await updateDocument(path,deletedMarker,doc.etag);
+      // Keep the marker until all snapshots are removed, so partial cleanup can be retried.
+      try{
+        const snapshots=(await listDocuments('partidas/')).filter(p=>p.startsWith(`partidas/pelada_${number}_`)&&p.endsWith('.json'));
+        for(const snapshot of snapshots)await deleteDocument(snapshot);
+        const marker=await readDocument(path);
+        if(marker){if(marker.content!==deletedMarker)throw new ConflictError();await deleteDocument(path,marker.etag);}
+      }catch(e){console.error('Limpeza pendente da pelada',number,e);return output(500,{error:'A pelada foi desativada, mas a limpeza dos arquivos falhou. Use Concluir exclusão para tentar novamente.'});}
       return output(200,{ok:true});
     }
     if(data.action==='savePelada'){
@@ -104,7 +119,7 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
       const addIds=data.addToRankingIds??[];
       if(!Array.isArray(addIds)||addIds.some(id=>typeof id!=='string'||!players.some(p=>p.id===id)))return output(400,{error:'Jogadores inválidos para o ranking.'});
       for(let i=0;i<6;i++){
-        const ids=(await listDocuments('peladas/')).map(p=>Number(p.match(/pelada_(\d+)\.csv$/)?.[1]||0));
+        const ids=await usedPeladaNumbers();
         const number=Math.max(0,...ids)+1;
         try{
           await createDocument(peladaPath(number),peladaToCsv({players,createdAt:new Date().toISOString()}));

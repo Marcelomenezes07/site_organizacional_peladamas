@@ -1,6 +1,6 @@
-import { get, list, put } from '@vercel/blob';
+import { get, list, put, del } from '@vercel/blob';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rename, stat, writeFile, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 export type Document = { content: string; etag: string };
@@ -28,7 +28,7 @@ export async function readDocument(path:string):Promise<Document|null>{
 }
 export async function listDocuments(prefix:string):Promise<string[]>{
   if(!useBlob){
-    try {const names=await readdir(join(baseDir,prefix));return names.filter(n=>n.endsWith('.csv')).map(n=>prefix+n);}
+    try {const names=await readdir(join(baseDir,prefix));return names.filter(n=>/\.(csv|json)$/.test(n)).map(n=>prefix+n);}
     catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return [];throw e;}
   }
   ensureConfiguration();
@@ -74,4 +74,21 @@ async function updateUnlocked(path:string,content:string,expectedEtag:string):Pr
 export async function localStorageStatus():Promise<boolean>{
   if(useBlob)return true;
   try{await stat(baseDir);return true;}catch{return false;}
+}
+
+export async function deleteDocument(path:string,expectedEtag?:string):Promise<void>{
+  if(useBlob){
+    ensureConfiguration();
+    try{await del(path,expectedEtag?{ifMatch:expectedEtag}:{});}
+    catch(e){if(/precondition|conflict|412|409|ifmatch/i.test(String(e)))throw new ConflictError();throw e;}
+    return;
+  }
+  const previous=locks.get(path)??Promise.resolve();
+  let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+  const queued=previous.then(()=>gate);locks.set(path,queued);await previous;
+  try{
+    const current=await localRead(path);if(!current)return;
+    if(expectedEtag&&current.etag!==expectedEtag)throw new ConflictError();
+    await unlink(localKey(path));
+  }finally{release();if(locks.get(path)===queued)locks.delete(path);}
 }

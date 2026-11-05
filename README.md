@@ -68,7 +68,7 @@ O CSV de cada pelada tem também a coluna `criada_em`. Os snapshots são indepen
 
 - **Acesso administrativo:** a interface e a API exigem sessão. As credenciais são verificadas no servidor; o cookie é HttpOnly, SameSite=Strict e Secure em produção, com validade de 12 horas. O botão Sair remove o cookie. Tentativas de login têm limitação por IP por instância.
 - `ADMIN_PASSWORD_HASH` usa o formato `salt:hash`, com scrypt de 64 bytes. `ADMIN_SESSION_SECRET` deve ser aleatório, com pelo menos 32 caracteres. Configure ambos como segredos na Vercel. Nenhum deles usa prefixo `VITE_`.
-- **Excluir pelada:** exige confirmação e versão atual do histórico. Os dados dos jogadores são removidos daquele arquivo; um marcador reserva o número para não reutilizá-lo. Não altera o Geral nem outros históricos.
+- **Excluir pelada:** exige confirmação e versão atual do histórico. Os dados dos jogadores são removidos daquele arquivo; o CSV e as revisões de partidas são removidos. Um registro mínimo em `excluidas/pelada_N.json` reserva somente o número para não reutilizá-lo. Não altera o Geral nem outros históricos.
 - O `BLOB_READ_WRITE_TOKEN` deve ficar **somente no backend**. Nunca use `VITE_BLOB_READ_WRITE_TOKEN`.
 - Cada gravação existente usa ETag (`ifMatch`), reduzindo risco de sobrescrever uma alteração concorrente; em caso de conflito, é necessário recarregar e reaplicar a mudança.
 - Os sorteios são executados no navegador. As equipes sorteadas **não são armazenadas**, apenas os jogadores e estrelas da pelada.
@@ -82,7 +82,7 @@ Histórico de sorteios, importação CSV, backups versionados, edição em tempo
 
 ## Página pública de cada pelada
 
-- `/pelada/NUMERO` abre sem login. No administrador, sorteie e clique em **Salvar times na página pública**. Use **Abrir página da pelada** ou **Copiar link** para compartilhar.
+- `/pelada/NUMERO` abre sem login. No administrador, clique em **Sortear times**. O sorteio é salvo automaticamente antes de liberar **Copiar link**. Use **Abrir página da pelada** ou **Copiar link** para compartilhar.
 - **Atualizar pelada** permite criar partidas, marcar como a jogar/finalizada e corrigir placar, autores e assistências. Cada gol deve ser atribuído a um jogador do time ou marcado como gol contra. Assistências são opcionais.
 - **Resumo** mostra líderes (incluindo empates), classificação por pontos/saldo/gols marcados e rankings de gols e assistências. Partidas a jogar não pontuam.
 - Vitórias valem 3 pontos e empates 1 ponto. Gol contra conta para o time beneficiado, sem crédito individual.
@@ -90,3 +90,11 @@ Histórico de sorteios, importação CSV, backups versionados, edição em tempo
 - `peladas/pelada_N.csv` contém `gols`, `assistencias` e `estado_partidas`. O último campo aponta para um arquivo privado `partidas/pelada_N_UUID.json`, com os times e as partidas daquela revisão. Os totais são recalculados, nunca incrementados manualmente.
 - A revisão é gravada primeiro; depois uma atualização condicional por ETag publica o ponteiro e os totais juntos no CSV. Uma escrita concorrente recebe conflito, mantendo a edição na tela para revisão. Arquivos de revisões anteriores permanecem privados; apenas o ponteiro atual é usado.
 - CSVs antigos continuam funcionando. Ao salvar os times ou editar a pelada, as novas colunas são escritas sem alterar o Ranking Geral.
+
+### Exclusão e publicação dos times
+
+O botão **Sortear times** só apresenta o sorteio como concluído após a gravação no servidor. Se já existirem times publicados, substituir exige confirmação; com partidas registradas, a troca continua bloqueada.
+
+Excluir uma pelada remove o CSV e os JSONs de suas revisões. O número fica reservado em `excluidas/pelada_N.json`, sem nomes nem resultados. Se a limpeza falhar, ou houver marcadores de exclusões feitos pela versão anterior, o administrador vê **Concluir exclusão** para repetir a limpeza. A página pública retorna 404 para uma pelada desativada ou removida.
+
+As alterações devem ser enviadas primeiro ao GitHub para teste local. Deploy na Vercel somente após autorização explícita do responsável, usando a versão atual do GitHub.

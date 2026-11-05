@@ -2,7 +2,8 @@ import {beforeEach,describe,it,expect,vi} from 'vitest';
 const memory=vi.hoisted(()=>({docs:new Map<string,{content:string;etag:string}>(),v:0,failCommit:false}));
 vi.mock('../lib/storage.js',()=>{
   class ConflictError extends Error{}
-  return {ConflictError,readDocument:async(p:string)=>memory.docs.get(p)??null,listDocuments:async(prefix:string)=>[...memory.docs.keys()].filter(p=>p.startsWith(prefix)&&p.endsWith('.csv')),
+  return {ConflictError,readDocument:async(p:string)=>memory.docs.get(p)??null,listDocuments:async(prefix:string)=>[...memory.docs.keys()].filter(p=>p.startsWith(prefix)),
+    deleteDocument:async(p:string)=>{memory.docs.delete(p);},
     createDocument:async(p:string,content:string)=>{if(memory.docs.has(p))throw new ConflictError();memory.docs.set(p,{content,etag:String(++memory.v)});},
     updateDocument:async(p:string,content:string,etag:string)=>{if(memory.failCommit)throw new Error('Storage failed');if(memory.docs.get(p)?.etag!==etag)throw new ConflictError();memory.docs.set(p,{content,etag:String(++memory.v)});},
   };
@@ -68,6 +69,8 @@ describe('Página pública e persistência',()=>{
     expect((await handleApi('POST',{action:'savePelada',number:1,etag:doc.etag,players:players.map((p,i)=>i? p:{...p,id:'new'})})).status).toBe(400);
     expect((await handleApi('POST',{action:'deletePelada',number:1,etag:doc.etag})).status).toBe(200);
     expect((await handlePublicPelada('GET',1,null)).status).toBe(404);
+    expect(memory.docs.has('peladas/pelada_1.csv')).toBe(false);
+    expect([...memory.docs.keys()].filter(p=>p.startsWith('partidas/pelada_1_'))).toEqual([]);
   });
   it('partidas agendadas não contam; gol contra não entra no ranking individual',async()=>{
     await publish();await save({...match('future'),status:'scheduled',homeScore:0,goals:[]});
