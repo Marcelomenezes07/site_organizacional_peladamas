@@ -5,7 +5,7 @@ import {useConfirmation} from './useConfirmation';
 
 export default function PublicPeladaPage({number}:{number:number}){
   const [data,setData]=useState<PublicPelada|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
-  const [tab,setTab]=useState<'update'|'summary'>('update'),[ranking,setRanking]=useState<'goals'|'assists'>('goals');
+  const [tab,setTab]=useState<'update'|'summary'|'teams'>('update'),[ranking,setRanking]=useState<'goals'|'assists'>('goals');
   const [draft,setDraft]=useState<Match|null>(null),[version,setVersion]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   const {confirm,confirmation}=useConfirmation();
   const refresh=useCallback(async()=>{try{setData(await getPelada(number));setError('');}catch(e){if(e instanceof PeladaError&&e.status===404)setData(null);setError((e as Error).message);}finally{setLoading(false);}},[number]);
@@ -44,7 +44,7 @@ export default function PublicPeladaPage({number}:{number:number}){
   return <div className="app public-pelada">{confirmation}
     <header className="header"><div className="header-inner"><div className="brand"><div className="brand-icon">⚽</div><div><h1>PELA<span>DAMAS</span></h1><p>PELADA {number}</p></div></div><button className="connection" onClick={()=>void refresh()}>Atualizar</button></div></header>
     <main className="main"><div className="section-top"><div><span className="eyebrow">JUNTOS EM CAMPO</span><h2>Pelada {number}</h2></div><span className="label-tag">Sem login</span></div>
-      <nav className="tabs" aria-label="Página da pelada"><button className={'tab '+(tab==='update'?'selected':'')} onClick={()=>setTab('update')}>Atualizar pelada</button><button className={'tab '+(tab==='summary'?'selected':'')} onClick={()=>setTab('summary')}>Resumo</button></nav>
+      <nav className="tabs public-tabs" aria-label="Página da pelada"><button className={'tab '+(tab==='update'?'selected':'')} onClick={()=>setTab('update')}>Atualizar pelada</button><button className={'tab '+(tab==='summary'?'selected':'')} onClick={()=>setTab('summary')}>Resumo</button><button className={'tab '+(tab==='teams'?'selected':'')} onClick={()=>setTab('teams')}>Times</button></nav>
       {error&&<div className="panel error-text" role="alert">{error}<button className="button subtle" onClick={()=>void refresh()}>Tentar novamente</button></div>}
       {loading?<p role="status">Carregando pelada…</p>:data&&<>
         {!data.teams.length?<div className="panel"><h3>Aguardando os times</h3><p>O administrador precisa sortear e salvar os times. Esta página atualiza automaticamente.</p></div>:tab==='update'?<>
@@ -66,12 +66,11 @@ export default function PublicPeladaPage({number}:{number:number}){
           </section>}
           {notice&&<div className="panel" role="status">{notice}</div>}
           <section aria-label="Histórico de partidas">{!data.matches.length?<div className="panel"><p>Nenhuma partida registrada.</p></div>:[...data.matches].reverse().map((m,i)=><article key={m.id} className="panel match-card"><div className="panel-heading"><span className="eyebrow">PARTIDA {data.matches.length-i} · {m.status==='finished'?'FINALIZADA':'A JOGAR'}</span><button className="button subtle" disabled={busy} onClick={()=>void edit(m)}>Editar</button></div><h3>{teamName(m.homeId)} <span>{m.status==='finished'?`${m.homeScore} × ${m.awayScore}`:'×'}</span> {teamName(m.awayId)}</h3>{m.goals.map((g,j)=><p key={j} className="match-event">⚽ {g.ownGoal?`Gol contra a favor do ${teamName(g.teamId)}`:data.players.find(p=>p.id===g.scorerId)?.name}{g.assistId?` · Assistência: ${data.players.find(p=>p.id===g.assistId)?.name}`:''}</p>)}</article>)}</section>
-        </>:<>
+        </>:tab==='summary'?<>
           <div className="stat-grid"><div className="stat"><div className="stat-label">Time líder</div><strong className="leader-name">{leaders}</strong></div><div className="stat"><div className="stat-label">Artilheiro</div><strong className="leader-name">{top('goals')}</strong></div><div className="stat"><div className="stat-label">Garçom</div><strong className="leader-name">{top('assists')}</strong></div></div>
           <section className="panel"><h3>Classificação dos times</h3><p className="hint">Vitória: 3 pontos · Empate: 1 ponto. Desempate: saldo de gols e gols marcados. Empates restantes são compartilhados.</p><div className="table-scroll"><table><caption className="sr-only">Estatísticas dos times</caption><thead><tr>{['Time','PTS','J','V','E','D','GP','GC','SG'].map(h=><th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{summary!.table.map(t=><tr key={t.id}><th scope="row">{t.name}</th>{[t.points,t.played,t.wins,t.draws,t.losses,t.goalsFor,t.goalsAgainst,t.balance].map((n,i)=><td key={i}>{n}</td>)}</tr>)}</tbody></table></div><p className="hint">J: jogos · V: vitórias · E: empates · D: derrotas · GP: gols pró · GC: gols contra · SG: saldo.</p></section>
           <section className="panel"><h3>Ranking dos jogadores</h3><div className="mode-buttons" aria-label="Ranking individual"><button className={ranking==='goals'?'active':''} onClick={()=>setRanking('goals')}>Gols</button><button className={ranking==='assists'?'active':''} onClick={()=>setRanking('assists')}>Assistências</button></div>{ranked.map(p=><div className="ranking-result" key={p.id}><span>{p.name}</span><strong>{p[ranking]} {ranking==='goals'?(p[ranking]===1?'gol':'gols'):(p[ranking]===1?'assistência':'assistências')}</strong></div>)}</section>
-        </>}
-        {!!data.teams.length&&<section className="panel"><h3>Times da pelada</h3><div className="public-rosters">{data.teams.map(t=><div key={t.id}><h4>{t.name}</h4><p>{t.playerIds.map(id=>data.players.find(p=>p.id===id)?.name).join(', ')}</p></div>)}</div></section>}
+        </>:<section className="panel" aria-labelledby="public-teams-title"><h3 id="public-teams-title">Times da pelada</h3><p className="hint">Confira seu time e quem joga com você.</p><div className="public-rosters">{data.teams.map(t=><article className="public-team" key={t.id}><h4>{t.name}</h4><p>{t.playerIds.length} jogadores</p><ul>{t.playerIds.map(id=><li key={id}>{data.players.find(p=>p.id===id)?.name||'Jogador indisponível'}</li>)}</ul></article>)}</div></section>}
       </>}
       <footer><p>Atualização automática a cada 12 segundos. Qualquer pessoa com este link pode registrar e corrigir partidas.</p></footer>
     </main>

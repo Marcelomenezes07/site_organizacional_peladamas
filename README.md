@@ -98,3 +98,5 @@ O botão **Sortear times** só apresenta o sorteio como concluído após a grava
 Excluir uma pelada remove o CSV e os JSONs de suas revisões. O número fica reservado em `excluidas/pelada_N.json`, sem nomes nem resultados. Se a limpeza falhar, ou houver marcadores de exclusões feitos pela versão anterior, o administrador vê **Concluir exclusão** para repetir a limpeza. A página pública retorna 404 para uma pelada desativada ou removida.
 
 As alterações devem ser enviadas primeiro ao GitHub para teste local. Deploy na Vercel somente após autorização explícita do responsável, usando a versão atual do GitHub.
+
+A página pública de cada pelada tem três abas: Atualizar pelada, Resumo e Times. Em Times, cada equipe mostra sua lista de jogadores.
