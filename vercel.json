@@ -1,0 +1,22 @@
+{
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/adm",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/adm",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/adm/",
+      "destination": "/index.html"
+    }
+  ]
+}
