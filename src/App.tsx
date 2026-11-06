@@ -4,7 +4,7 @@ import { useConfirmation } from './useConfirmation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownToLine, ArrowRight, Check, CheckCircle2, ChevronDown, Clipboard,
-  Cloud, CloudOff, Copy, FilePlus2, FileSpreadsheet, History, Info, LoaderCircle,
+  CircleDot, Cloud, CloudOff, Copy, FilePlus2, FileSpreadsheet, History, Info, LoaderCircle,
   PencilLine, Plus, RefreshCw, RotateCcw, Search, Settings2, ShieldAlert, Shuffle,
   Sparkles, Trash2, Trophy, Users, X
 } from 'lucide-react';
@@ -205,8 +205,8 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     <header className="header">
       <div className="header-inner">
         <div className="brand">
-          <div className="brand-icon">⚽</div>
-          <div><h1>PELA<span>DAMAS</span></h1><p>SEUS TIMES. SUA PELADA.</p></div>
+          <div className="brand-icon"><CircleDot size={28} aria-hidden="true"/></div>
+          <div><h1>PELA<span>DAMAS</span></h1><p>Administração</p></div>
         </div>
         <div className={'connection '+(online?'connected':'disconnected')} title={lastSync?`Atualizado às ${lastSync.toLocaleTimeString('pt-BR')}`:''}>
           {online?<Cloud size={15}/>:<CloudOff size={15}/>} <span>{online?'Sincronizado':'Sem conexão'}</span>
@@ -218,15 +218,15 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
       <div className="topline"><button className="refresh" onClick={async()=>{if(dirty&&!await confirm('Sair sem salvar as alterações?'))return;void onLogout().catch(e=>showMessage(e.message));}}>Sair</button><span><span className="online-indicator"/> Administração</span><button className="refresh" onClick={()=>void refresh()} title="Atualizar dados"><RefreshCw size={15}/> Atualizar</button></div>
 
       <nav className="tabs" aria-label="Áreas do Peladamas">
-        <button type="button" onClick={()=>{setTab('ranking');setFeedback('');}} className={'tab '+(tab==='ranking'?'selected':'')}><Trophy size={18}/> Ranking geral</button>
-        <button type="button" onClick={()=>{setTab('sorteio');setFeedback('');}} className={'tab '+(tab==='sorteio'?'selected':'')}><Shuffle size={18}/> Sortear times</button>
+        <button type="button" aria-pressed={tab==='ranking'} onClick={()=>{setTab('ranking');setFeedback('');}} className={'tab '+(tab==='ranking'?'selected':'')}><Trophy size={18}/> Ranking geral</button>
+        <button type="button" aria-pressed={tab==='sorteio'} onClick={()=>{setTab('sorteio');setFeedback('');}} className={'tab '+(tab==='sorteio'?'selected':'')}><Shuffle size={18}/> Sortear times</button>
       </nav>
 
       {!!state?.pendingDeletions?.length&&<div className="panel"><h3>Arquivos com exclusão pendente</h3><p>Estas peladas já estão desativadas. Conclua a remoção dos arquivos antigos.</p>{state.pendingDeletions.map(number=><button key={number} className="button danger" disabled={saving} onClick={()=>void deletePelada(number)}>Concluir exclusão da Pelada {number}</button>)}</div>}
       {loading?<div className="loading-screen"><LoaderCircle size={30} className="spinner"/><p>Carregando rankings...</p></div>:
       !state?<div className="panel"><Empty icon={<CloudOff size={28}/>} heading="Não foi possível acessar os dados" detail="Confira se a API está funcionando e se o armazenamento foi configurado."/><button className="button primary full" onClick={()=>void refresh(true)}>Tentar novamente</button>{feedback&&<p className="error-text">{feedback}</p>}</div>:
       tab==='ranking'?<>
-        <div className="section-top"><div><span className="eyebrow">CADASTRO DE JOGADORES</span><h3>Ranking de estrelas</h3></div><span className="label-tag"><History size={13}/> Histórico</span></div>
+        <div className="section-top"><div><h2>Ranking de estrelas</h2></div><span className="label-tag"><History size={13}/> Histórico</span></div>
         <div className="panel selector-card"><label htmlFor="rankingSelector" className="form-label">Visualizar ranking</label>
           <div className="select-wrap"><select id="rankingSelector" className="main-select" value={view} onChange={e=>setRankingView(e.target.value)}>
             <option value="geral">⭐ Geral — ranking principal</option>
@@ -239,7 +239,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
         <div className="stat-grid">
           <div className="stat"><div className="stat-icon"><Users size={18}/></div><div className="stat-number">{draft.length}</div><div className="stat-label">Jogadores</div></div>
           <div className="stat"><div className="stat-icon"><Sparkles size={18}/></div><div className="stat-number">{formatStars(rankAvg)}</div><div className="stat-label">Média de estrelas</div></div>
-          <div className="stat"><div className="stat-icon"><FileSpreadsheet size={18}/></div><div className="stat-number">{view==='geral'?'GERAL':`#${view}`}</div><div className="stat-label">Arquivo CSV</div></div>
+          <div className="stat"><div className="stat-icon"><FileSpreadsheet size={18}/></div><div className="stat-number">{view==='geral'?'GERAL':`#${view}`}</div><div className="stat-label">Ranking selecionado</div></div>
         </div>
         <div className="panel rank-panel">
           <div className="panel-heading"><div><h3>{view==='geral'?'Todos os craques':`Jogadores da Pelada ${view}`}</h3><p>Edite as estrelas de 0,5 em 0,5.</p></div>
@@ -248,19 +248,19 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
               exportCSV(view==='geral'?'ranking_geral.csv':`pelada_${view}.csv`,p);
             }}><ArrowDownToLine size={19}/></button></div>
           <div className="search-wrap"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar jogador..." aria-label="Buscar jogador" /></div>
-          <div className="table-header"><span>#</span><span>JOGADOR</span><span>ESTRELAS</span><span></span></div>
-          <div className="ranking-rows">
-            {rankRows.length===0?<Empty icon={<Search size={26}/>} heading="Nenhum jogador" detail="Experimente outro nome de busca."/>:rankRows.map(p=>
-              <div className="ranking-row" key={p.id}>
-                <span className="rank-position">{ordered(draft).findIndex(x=>x.id===p.id)+1}</span>
-                <div className="player-info">
+          <div role="table" aria-label="Ranking dos jogadores"><div className="table-header" role="row"><span role="columnheader">#</span><span role="columnheader">JOGADOR</span><span role="columnheader">ESTRELAS</span><span role="columnheader" aria-label="Ações"></span></div>
+          <div className="ranking-rows" role="rowgroup">
+            {rankRows.length===0?<div role="row"><div role="cell" aria-colspan={4}><Empty icon={<Search size={26}/>} heading="Nenhum jogador" detail="Experimente outro nome de busca."/></div></div>:rankRows.map(p=>
+              <div className="ranking-row" key={p.id} role="row">
+                <span className="rank-position" role="cell">{ordered(draft).findIndex(x=>x.id===p.id)+1}</span>
+                <div className="player-info" role="cell">
                   {view==='geral'?<input className="inline-name" value={p.name} onChange={e=>modifyPlayer(p.id,{name:e.target.value})} aria-label={`Nome de ${p.name}`}/>:<strong>{p.name}</strong>}
                   {view==='geral'?<input className="alias" value={p.aliases} placeholder="Apelidos (separar por |)" onChange={e=>modifyPlayer(p.id,{aliases:e.target.value})} aria-label={`Apelidos de ${p.name}`}/>:<span className="alias-static">Pelada {view}</span>}
                 </div>
-                <StarsSelect value={p.stars} ariaLabel={`Estrelas de ${p.name}`} onChange={s=>modifyPlayer(p.id,{stars:s})}/>
-                <button className="delete-button" onClick={()=>deletePlayer(p.id)} aria-label={`Excluir ${p.name}`} title="Excluir deste ranking"><Trash2 size={17}/></button>
+                <div role="cell"><StarsSelect value={p.stars} ariaLabel={`Estrelas de ${p.name}`} onChange={s=>modifyPlayer(p.id,{stars:s})}/></div>
+                <div role="cell"><button className="delete-button" onClick={()=>deletePlayer(p.id)} aria-label={`Excluir ${p.name}`} title="Excluir deste ranking"><Trash2 size={17}/></button></div>
               </div>)}
-          </div>
+          </div></div>
           {view==='geral'&&<div className="add-area">{showAdd?<form onSubmit={e=>{e.preventDefault();addPlayer();}} className="add-form">
             <div className="add-fields"><input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Nome do jogador" maxLength={55} required/><StarsSelect value={newStars} onChange={setNewStars}/></div>
             <input value={newAliases} onChange={e=>setNewAliases(e.target.value)} placeholder="Apelidos separados por | (opcional)" maxLength={180}/>
@@ -268,11 +268,11 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           </form>:<button className="add-button" onClick={()=>setShowAdd(true)}><Plus size={17}/> Adicionar jogador</button>}</div>}
           <div className="save-area"><button className="button subtle" disabled={!dirty||saving} onClick={discard}><RotateCcw size={16}/> Descartar</button><button className="button primary" disabled={!dirty||saving} onClick={()=>void saveRanking()}>{saving?<LoaderCircle className="spinner" size={17}/>:<Check size={17}/>} Salvar alterações</button></div>
           <p className={'save-note '+(dirty?'attention':'')}>{dirty?'● Alterações ainda não salvas.':<><CheckCircle2 size={14}/> As alterações salvas aparecem em todos os celulares.</>}</p>
-          {feedback&&<div className={'feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
+          {feedback&&<div role="status" aria-live="polite" className={'feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
         </div>
       </>:<>
         <div className="section-top"><div><span className="eyebrow">ORGANIZAÇÃO DA PELADA</span><h3>{mode==='criar'?'Criar nova pelada':'Sorteio inteligente'}</h3></div><span className="label-tag"><Shuffle size={13}/> Equilibrado</span></div>
-        <div className="mode-buttons"><button className={mode==='sortear'?'active':''} onClick={()=>{setMode('sortear');setFeedback('');}}><Shuffle size={17}/> Sortear pelada</button><button className={mode==='criar'?'active':''} onClick={()=>{setMode('criar');setFeedback('');}}><FilePlus2 size={17}/> Criar pelada</button></div>
+        <div className="mode-buttons"><button aria-pressed={mode==='sortear'} className={mode==='sortear'?'active':''} onClick={()=>{setMode('sortear');setFeedback('');}}><Shuffle size={17}/> Sortear pelada</button><button aria-pressed={mode==='criar'} className={mode==='criar'?'active':''} onClick={()=>{setMode('criar');setFeedback('');}}><FilePlus2 size={17}/> Criar pelada</button></div>
         {mode==='criar'?<>
           <div className="panel creation-intro"><div className="step-number">01</div><div><span className="eyebrow">PRIMEIRO PASSO</span><h3>Cole a lista do WhatsApp</h3><p>Reconhecemos os nomes automaticamente pelo ranking e apelidos.</p></div></div>
           <div className="panel"><label className="form-label" htmlFor="whatslist">Jogadores convocados</label>
@@ -310,9 +310,9 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
             </div>}
           </>}
         </>}
-        {feedback&&<div className={'feedback bottom-feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
+        {feedback&&<div role="status" aria-live="polite" className={'feedback bottom-feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
       </>}
-      <footer><div className="footer-mark">⚽ <strong>PELA<span>DAMAS</span></strong></div><p>Feito pra pelada ser justa. Salvo na nuvem, para todo mundo.</p></footer>
+      <footer><div className="footer-mark"><CircleDot size={18} aria-hidden="true"/> <strong>PELA<span>DAMAS</span></strong></div><p>Feito pra pelada ser justa. Salvo na nuvem, para todo mundo.</p></footer>
     </main>
   </div>;
 }

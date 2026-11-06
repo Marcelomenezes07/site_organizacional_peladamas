@@ -8,14 +8,14 @@ const api=vi.hoisted(()=>({getPelada:vi.fn(),changePelada:vi.fn()}));
 vi.mock('../src/pelada-api',()=>({...api,PeladaError:class extends Error{status=500;}}));
 let host:HTMLDivElement,root:Root,game:PublicPelada;
 const click=async(label:string,scope:ParentNode=document)=>{
- const b=Array.from(scope.querySelectorAll('button')).find(b=>b.textContent===label)!;
+ const b=Array.from(scope.querySelectorAll('button')).find(b=>b.textContent?.trim()===label)!;
  expect(b).toBeTruthy();await act(async()=>b.click());
 };
 beforeEach(async()=>{
  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
- game={number:1,createdAt:'2026-11-05',etag:'version-1',players:[{id:'a',name:'Jogador A',goals:0,assists:0},{id:'b',name:'Jogador B',goals:0,assists:0}],teams:[{id:'time-1',name:'Time 1',playerIds:['a']},{id:'time-2',name:'Time 2',playerIds:['b']}],matches:[]};
+ game={number:1,createdAt:'2026-11-05',etag:'version-1',players:[{id:'a',name:'Jogador A',goals:0,assists:0},{id:'b',name:'Jogador B',goals:0,assists:0},{id:'c',name:'Jogador C',goals:0,assists:0}],teams:[{id:'time-1',name:'Time 1',playerIds:['a']},{id:'time-2',name:'Time 2',playerIds:['b']},{id:'time-3',name:'Time 3',playerIds:['c']}],matches:[]};
  vi.clearAllMocks();api.getPelada.mockImplementation(async()=>structuredClone(game));
- api.changePelada.mockImplementation(async(_n,body)=>{game.matches=[structuredClone(body.match)];game.etag='version-2';});
+ api.changePelada.mockImplementation(async(_n,body)=>{game.matches=game.matches.some(m=>m.id===body.match.id)?game.matches.map(m=>m.id===body.match.id?structuredClone(body.match):m):[...game.matches,structuredClone(body.match)];game.etag='version-2';});
  host=document.createElement('div');document.body.append(host);root=createRoot(host);
  await act(async()=>root.render(<PublicPeladaPage number={1}/>));
 });
@@ -82,4 +82,26 @@ it('keeps a failed quick goal visible and blocks a stale update instead of overw
  expect(document.querySelector('.quick-goal')?.textContent).toContain('Outro jogador');
  const save=Array.from(document.querySelectorAll<HTMLButtonElement>('.quick-goal button')).find(b=>b.textContent==='Salvar gol')!;
  expect(save.disabled).toBe(true);expect(game.matches[0].homeScore).toBe(0);
+});
+
+it('asks before changing a team with goals and preserves events when canceled',async()=>{
+ await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);
+ await click('+ Gol · Time 1',document.querySelector('.match-card')!);
+ const scorer=document.querySelector<HTMLSelectElement>('.quick-goal select')!;
+ await act(async()=>{scorer.value='a';scorer.dispatchEvent(new Event('change',{bubbles:true}));});
+ await click('Salvar gol',document.querySelector('.quick-goal')!);await click('Editar');
+ const home=document.querySelector<HTMLSelectElement>('.match-editor select')!;
+ await act(async()=>{home.value='time-3';home.dispatchEvent(new Event('change',{bubbles:true}));});
+ expect(document.querySelector('[role="dialog"]')?.textContent).toContain('remover os gols');
+ await click('Cancelar',document.querySelector('[role="dialog"]')!);
+ expect(document.querySelectorAll('.goal-entry')).toHaveLength(1);
+ await click('Salvar partida',document.querySelector('.match-editor')!);
+ expect(game.matches[0].homeId).toBe('time-1');expect(game.matches[0].homeScore).toBe(1);
+});
+it('keeps previous games in a collapsed section of this same pelada',async()=>{
+ for(let i=0;i<2;i++){await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);}
+ const history=document.querySelector<HTMLDetailsElement>('.match-history')!;
+ expect(history.open).toBe(false);expect(history.textContent).toContain('Outros jogos desta pelada');
+ expect(document.querySelector('.featured')?.textContent).toContain('Partida 2');
+ expect(history.querySelector('.match-card')?.textContent).toContain('Partida 1');
 });
