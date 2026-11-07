@@ -4,7 +4,7 @@ import { useConfirmation } from './useConfirmation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownToLine, ArrowRight, Check, CheckCircle2, ChevronDown, Clipboard,
-  CircleDot, Cloud, CloudOff, Copy, FilePlus2, FileSpreadsheet, History, Info, LoaderCircle,
+  Cloud, CloudOff, Copy, FilePlus2, FileSpreadsheet, History, Info, LoaderCircle,
   PencilLine, Plus, RefreshCw, RotateCcw, Search, Settings2, ShieldAlert, Shuffle,
   Sparkles, Trash2, Trophy, Users, X
 } from 'lucide-react';
@@ -205,7 +205,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     <header className="header">
       <div className="header-inner">
         <div className="brand">
-          <div className="brand-icon"><CircleDot size={28} aria-hidden="true"/></div>
+          <div className="brand-icon" aria-hidden="true">⚽</div>
           <div><h1>PELA<span>DAMAS</span></h1><p>Administração</p></div>
         </div>
         <div className={'connection '+(online?'connected':'disconnected')} title={lastSync?`Atualizado às ${lastSync.toLocaleTimeString('pt-BR')}`:''}>
@@ -219,7 +219,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
 
       <nav className="tabs" aria-label="Áreas do Peladamas">
         <button type="button" aria-pressed={tab==='ranking'} onClick={()=>{setTab('ranking');setFeedback('');}} className={'tab '+(tab==='ranking'?'selected':'')}><Trophy size={18}/> Ranking geral</button>
-        <button type="button" aria-pressed={tab==='sorteio'} onClick={()=>{setTab('sorteio');setFeedback('');}} className={'tab '+(tab==='sorteio'?'selected':'')}><Shuffle size={18}/> Sortear times</button>
+        <button type="button" aria-pressed={tab==='sorteio'} onClick={()=>{setTab('sorteio');setFeedback('');}} className={'tab '+(tab==='sorteio'?'selected':'')}><Shuffle size={18}/> Organizar pelada</button>
       </nav>
 
       {!!state?.pendingDeletions?.length&&<div className="panel"><h3>Arquivos com exclusão pendente</h3><p>Estas peladas já estão desativadas. Conclua a remoção dos arquivos antigos.</p>{state.pendingDeletions.map(number=><button key={number} className="button danger" disabled={saving} onClick={()=>void deletePelada(number)}>Concluir exclusão da Pelada {number}</button>)}</div>}
@@ -271,8 +271,9 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           {feedback&&<div role="status" aria-live="polite" className={'feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
         </div>
       </>:<>
-        <div className="section-top"><div><span className="eyebrow">ORGANIZAÇÃO DA PELADA</span><h3>{mode==='criar'?'Criar nova pelada':'Sorteio inteligente'}</h3></div><span className="label-tag"><Shuffle size={13}/> Equilibrado</span></div>
-        <div className="mode-buttons"><button aria-pressed={mode==='sortear'} className={mode==='sortear'?'active':''} onClick={()=>{setMode('sortear');setFeedback('');}}><Shuffle size={17}/> Sortear pelada</button><button aria-pressed={mode==='criar'} className={mode==='criar'?'active':''} onClick={()=>{setMode('criar');setFeedback('');}}><FilePlus2 size={17}/> Criar pelada</button></div>
+        <div className="organization-heading"><h2>Organizar pelada<span className="heading-dot">.</span></h2><p>Da lista de jogadores aos times prontos para jogar.</p></div>
+        <div className="mode-buttons" aria-label="Organização"><button aria-pressed={mode==='criar'} className={mode==='criar'?'active':''} onClick={()=>{setMode('criar');setFeedback('');}}><FilePlus2 size={17}/> Criar pelada</button><button aria-pressed={mode==='sortear'} className={mode==='sortear'?'active':''} onClick={()=>{setMode('sortear');setFeedback('');}}><Shuffle size={17}/> Peladas criadas</button></div>
+        <ol className="organization-path" aria-label="Etapas da organização"><li aria-current={mode==='criar'?'step':undefined}><span>1</span> Criar lista</li><li aria-current={mode==='sortear'?'step':undefined}><span>2</span> Sortear times</li><li><span>3</span> Compartilhar</li></ol>
         {mode==='criar'?<>
           <div className="panel creation-intro"><div className="step-number">01</div><div><span className="eyebrow">PRIMEIRO PASSO</span><h3>Cole a lista do WhatsApp</h3><p>Reconhecemos os nomes automaticamente pelo ranking e apelidos.</p></div></div>
           <div className="panel"><label className="form-label" htmlFor="whatslist">Jogadores convocados</label>
@@ -284,20 +285,19 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
             <div className="panel-heading"><div><span className="eyebrow">PASSO 02</span><h3>Revisar Pelada {countNext}</h3><p>{preview.length} jogadores encontrados · ajuste antes de criar.</p></div><span className="label-tag">{preview.length} <Users size={13}/></span></div>
             {unknownCount>0&&<div className="notice"><ShieldAlert size={18}/><span><strong>{unknownCount} nome(s) não encontrado(s) no ranking.</strong> Amarelo: nota provisória. Verde: nota ajustada. Ao criar a pelada, uma única pergunta permite adicionar todos os novos nomes ao Geral.</span></div>}
             <div className="preview-players">{preview.map(p=><div key={p.id} className={'preview-row'+(p.unmatched?(p.reviewed?' newcomer-reviewed':' newcomer-pending'):'')}><div className="preview-name"><input value={p.name} aria-label="Nome do convocado" onChange={e=>setPreview(old=>old.map(x=>x.id===p.id?{...x,name:e.target.value}:x))}/>{p.unmatched&&<small>{p.reviewed?'Novo · nota ajustada':'Novo · nota provisória'}</small>}</div><StarsSelect value={p.stars} ariaLabel={`Nota de ${p.name}`} onChange={n=>setPreview(old=>old.map(x=>x.id===p.id?{...x,stars:n,reviewed:true}:x))}/><button className="delete-button" title="Remover" onClick={()=>setPreview(old=>old.filter(x=>x.id!==p.id))}><X size={17}/></button></div>)}</div>
-            <button className="button primary full" disabled={saving||preview.length<4||preview.some(p=>!p.name.trim())||new Set(preview.map(p=>normalize(p.name))).size!==preview.length} onClick={()=>void createPelada()}>{saving?<LoaderCircle size={17} className="spinner"/>:<CheckCircle2 size={17}/>} Confirmar e criar Pelada {countNext}</button>
-            <p className="help-center">Ao confirmar, um arquivo CSV será salvo no armazenamento compartilhado.</p>
+            <button className="button primary full" disabled={saving||preview.length<4||preview.some(p=>!p.name.trim())||new Set(preview.map(p=>normalize(p.name))).size!==preview.length} onClick={()=>void createPelada()}>{saving?<LoaderCircle size={17} className="spinner"/>:<CheckCircle2 size={17}/>} Criar Pelada {countNext} e ir para o sorteio</button>
+            <p className="help-center">A lista será salva. Em seguida, confira os jogadores e sorteie os times.</p>
           </div>}
         </>:<>
           {!activePelada?<div className="panel"><Empty icon={<FilePlus2 size={28}/>} heading="Ainda não há peladas" detail="Crie a primeira pelada colando a lista do WhatsApp."/><button className="button primary full" onClick={()=>setMode('criar')}><Plus size={17}/> Criar primeira pelada</button></div>:<>
-            <PeladaLinks key={activePelada.number} number={activePelada.number} version={activePelada.etag}/>
             <div className="panel selector-card"><label className="form-label" htmlFor="sourceSelect">Escolha a pelada</label><div className="select-wrap"><select id="sourceSelect" className="main-select" value={activePelada.number} onChange={e=>selectPelada(Number(e.target.value))}>{state.peladas.map((p,i)=><option key={p.number} value={p.number}>{i===0?'Última — ':''}Pelada {p.number} · {p.players.length} jogadores</option>)}</select><ChevronDown size={17}/></div>
-            <div className="hint"><History size={15}/> As estrelas usadas serão as salvas no histórico desta pelada.</div><button className="button danger" disabled={saving} onClick={()=>void deletePelada(activePelada.number)}><Trash2 size={16}/> Excluir Pelada {activePelada.number}</button></div>
+            <div className="hint"><History size={15}/> O sorteio e o link abaixo pertencem à pelada selecionada.</div></div>
             <div className="stat-grid"><div className="stat"><div className="stat-icon"><Users size={18}/></div><div className="stat-number">{activePelada.players.length}</div><div className="stat-label">Convocados</div></div><div className="stat"><div className="stat-icon"><Trophy size={18}/></div><div className="stat-number">{Math.max(2,Math.ceil(activePelada.players.length/perTeam))}</div><div className="stat-label">Times</div></div><div className="stat"><div className="stat-icon"><Sparkles size={18}/></div><div className="stat-number">{formatStars(activePelada.players.reduce((s,p)=>s+p.stars,0))}</div><div className="stat-label">Total de estrelas</div></div></div>
-            <div className="panel"><div className="panel-heading"><div><h3>Jogadores da Pelada {activePelada.number}</h3><p>Notas deste histórico.</p></div><button className="icon-button" title="Baixar CSV" onClick={()=>exportCSV(`pelada_${activePelada.number}.csv`,peladaToCsv(activePelada))}><ArrowDownToLine size={19}/></button></div>
+            <details className="panel roster-review" key={`roster-${activePelada.number}`}><summary>Conferir os {activePelada.players.length} jogadores <ChevronDown size={18}/></summary><div className="panel-heading"><div><h3>Jogadores da Pelada {activePelada.number}</h3><p>Estas notas serão usadas no sorteio.</p></div><button className="icon-button" title="Baixar CSV" onClick={()=>exportCSV(`pelada_${activePelada.number}.csv`,peladaToCsv(activePelada))}><ArrowDownToLine size={19}/></button></div>
               <div className="roster-grid">{ordered(activePelada.players).map(p=><div className="roster-player" key={p.id}><span className="roster-dot"/><span>{p.name}</span><strong>{formatStars(p.stars)} ★</strong></div>)}</div>
               <div className="hint" style={{marginTop:14}}><PencilLine size={15}/> Para corrigir as estrelas, selecione esta pelada na aba Ranking.</div>
-            </div>
-            <div className="panel"><h3 className="settings-title"><Settings2 size={19}/> Configurações do sorteio</h3>
+            </details>
+            <div className="panel draw-settings"><h3 className="settings-title"><Settings2 size={19}/> Sortear times da Pelada {activePelada.number}</h3>
               <div className="setting-row"><label htmlFor="sizeInput">Jogadores por time</label><div className="select-wrap small"><select id="sizeInput" value={perTeam} onChange={e=>{setPerTeam(Number(e.target.value));setTeams(null);}}>{[4,5,6,7,8,9,10,11].map(n=><option key={n} value={n}>{n}</option>)}</select><ChevronDown size={15}/></div></div>
               <div className="draw-mode"><label className="form-label" htmlFor="drawMode">Como equilibrar os times</label><select id="drawMode" className="main-select" value={drawMode} onChange={e=>{setDrawMode(e.target.value as DrawMode);setTeams(null);}}><option value="balanced">Equilíbrio geral (recomendado)</option><option value="tiers">Por faixas de habilidade</option></select><p className="hint">{drawMode==='balanced'?'Busca médias próximas e distribui os jogadores mais fortes entre os times.':'Dá mais peso à distribuição das faixas: até 2, de 2,5 a 3,5 e de 4 a 5 estrelas, mantendo as médias próximas.'}</p></div>
               <div className="hint"><Info size={15}/> Considera apenas os convocados, sem regras fixas por nome. Todos participam; se sobrarem jogadores, os times terão tamanhos diferentes e o equilíbrio será calculado pela média.</div>
@@ -308,11 +308,13 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
               <div className="panel copy-panel"><h3><Clipboard size={18}/> Pronto para o WhatsApp</h3><textarea readOnly value={messageForTeams(teams,activePelada.number)} aria-label="Texto dos times" rows={Math.min(27,teams.flat().length+teams.length*3+3)}/>
               <button className="button primary full" onClick={()=>void copyTeams()}>{copied?<Check size={18}/>:<Copy size={18}/>} {copied?'Copiado!':'Copiar os times'}</button></div>
             </div>}
+            <PeladaLinks key={activePelada.number} number={activePelada.number} version={activePelada.etag}/>
+            <details className="manage-pelada"><summary>Gerenciar Pelada {activePelada.number}<ChevronDown size={17}/></summary><p>Excluir remove os jogos e o histórico desta pelada. O Ranking Geral é mantido.</p><button className="button danger" disabled={saving} onClick={()=>void deletePelada(activePelada.number)}><Trash2 size={16}/> Excluir Pelada {activePelada.number}</button></details>
           </>}
         </>}
         {feedback&&<div role="status" aria-live="polite" className={'feedback bottom-feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
       </>}
-      <footer><div className="footer-mark"><CircleDot size={18} aria-hidden="true"/> <strong>PELA<span>DAMAS</span></strong></div><p>Feito pra pelada ser justa. Salvo na nuvem, para todo mundo.</p></footer>
+      <footer><div className="footer-mark"><span aria-hidden="true">⚽</span> <strong>PELA<span>DAMAS</span></strong></div><p>Feito pra pelada ser justa. Salvo na nuvem, para todo mundo.</p></footer>
     </main>
   </div>;
 }
