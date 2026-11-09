@@ -1,8 +1,17 @@
-import {useCallback,useEffect,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import {CircleDot,RefreshCw,Plus,Pencil,ChevronDown,Users,Trophy,Target,Handshake,Check,Clock3} from 'lucide-react';
 import {summarize,type PublicPelada,type Match,type Goal} from '../lib/matches';
 import {getPelada,changePelada,PeladaError} from './pelada-api';
 import {useConfirmation} from './useConfirmation';
+
+// randomUUID requires HTTPS; getRandomValues also works on a local HTTP network.
+function newMatchId(){
+  if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
+  const bytes=crypto.getRandomValues(new Uint8Array(16));
+  bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+  const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
 
 export default function PublicPeladaPage({number}:{number:number}){
   const [data,setData]=useState<PublicPelada|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
@@ -12,14 +21,17 @@ export default function PublicPeladaPage({number}:{number:number}){
   const [lastSync,setLastSync]=useState<Date|null>(null);
   const [quickGoal,setQuickGoal]=useState<{match:Match;teamId:string;etag:string;scorer:string;assist:string;error:string}|null>(null);
   const {confirm,confirmation}=useConfirmation();
+  const editorRef=useRef<HTMLElement>(null);
+  useEffect(()=>{if(draft){editorRef.current?.scrollIntoView?.({block:'nearest'});editorRef.current?.querySelector<HTMLSelectElement>('select')?.focus({preventScroll:true});}},[draft?.id]);
   const refresh=useCallback(async()=>{try{setData(await getPelada(number));setLastSync(new Date());setError('');}catch(e){if(e instanceof PeladaError&&e.status===404)setData(null);setError((e as Error).message);}finally{setLoading(false);}},[number]);
   useEffect(()=>{void refresh();const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},12000);const visible=()=>{if(document.visibilityState==='visible')void refresh();};document.addEventListener('visibilitychange',visible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[refresh]);
   const summary=data?summarize(data,data.players):null;
   const teamName=(id:string)=>data?.teams.find(t=>t.id===id)?.name||id;
   async function edit(match?:Match){
     if(!data)return;
+    if(data.teams.length<2){setNotice('É preciso publicar pelo menos dois times para criar uma partida.');return;}
     if(draft&&!await confirm('Descartar a edição atual para abrir outra partida?'))return;
-    const next:Match=match?{...structuredClone(match),status:'finished'}:{id:crypto.randomUUID(),homeId:data.teams[0].id,awayId:data.teams[1].id,status:'finished',homeScore:0,awayScore:0,goals:[]};
+    const next:Match=match?{...structuredClone(match),status:'finished'}:{id:newMatchId(),homeId:data.teams[0].id,awayId:data.teams[1].id,status:'finished',homeScore:0,awayScore:0,goals:[]};
     setQuickGoal(null);setDraft(next);
     setVersion(data.etag);setNotice('');setTab('update');
   }
@@ -82,7 +94,7 @@ export default function PublicPeladaPage({number}:{number:number}){
   const leaders=played?summary!.table.filter(t=>t.points===first!.points&&t.balance===first!.balance&&t.goalsFor===first!.goalsFor).map(t=>t.name).join(' · '):'Aguardando partidas';
   function top(key:'goals'|'assists'){
     const max=Math.max(0,...(summary?.totals.map(p=>p[key])||[]));
-    return max?summary!.totals.filter(p=>p[key]===max).map(p=>p.name).join(' · ')+` (${max})`:'Ainda sem registros';
+    return max?summary!.totals.filter(p=>p[key]===max).map(p=>p.name).join(' · ')+` (${max})`:null;
   }
   const ranked=summary?[...summary.totals].sort((a,b)=>b[ranking]-a[ranking]||a.name.localeCompare(b.name)):[];
   function renderMatch(m:Match,index:number,featured=false){
@@ -119,7 +131,7 @@ export default function PublicPeladaPage({number}:{number:number}){
       {loading?<p role="status">Carregando pelada…</p>:data&&<>
         {!data.teams.length?<div className="panel"><h3>Aguardando os times</h3><p>O administrador precisa sortear e salvar os times. Esta página atualiza automaticamente.</p></div>:tab==='update'?<>
           <div className="matches-toolbar"><div><h3>Partidas da pelada</h3><p>Registre os gols. Acompanhe cada lance.</p></div><button className="button primary" disabled={busy} onClick={()=>void edit()}><Plus size={18} aria-hidden="true"/> Criar partida</button></div>
-          {draft&&<section className="panel match-editor" aria-labelledby="match-editor-title"><h3 id="match-editor-title">{data.matches.some(m=>m.id===draft.id)?'Editar partida':'Nova partida'}</h3>
+          {draft&&<section className="panel match-editor" ref={editorRef} aria-labelledby="match-editor-title"><h3 id="match-editor-title">{data.matches.some(m=>m.id===draft.id)?'Editar partida':'Nova partida'}</h3>
             {version!==data.etag&&<p role="alert" className="error-text">A pelada mudou em outro dispositivo. Sua edição foi mantida. Cancele e reabra a partida antes de salvar.</p>}
             <fieldset disabled={busy}><legend>{isNewMatch?'Times da partida':'Times e resultado'}</legend><div className="match-grid">
               <label>Time A<select value={draft.homeId} onChange={e=>void changeTeam('homeId',e.target.value)}>{data.teams.map(t=><option key={t.id} value={t.id} disabled={t.id===draft.awayId}>{t.name}</option>)}</select></label>
@@ -145,7 +157,7 @@ export default function PublicPeladaPage({number}:{number:number}){
             </>}
           </section>
         </>:tab==='summary'?<>
-          <div className="stat-grid"><div className="stat"><div className="stat-label"><Trophy size={18} aria-hidden="true"/> Time líder</div><strong className="leader-name">{leaders}</strong></div><div className="stat"><div className="stat-label"><Target size={18} aria-hidden="true"/> Artilheiro</div><strong className="leader-name">{top('goals')}</strong></div><div className="stat"><div className="stat-label"><Handshake size={18} aria-hidden="true"/> Garçom</div><strong className="leader-name">{top('assists')}</strong></div></div>
+          <div className="stat-grid"><div className="stat"><div className="stat-label"><Trophy size={18} aria-hidden="true"/> Time líder</div>{played?<strong className="leader-name">{leaders}</strong>:<span className="summary-empty">Sem partidas</span>}</div><div className="stat"><div className="stat-label"><Target size={18} aria-hidden="true"/> Artilheiro</div>{top('goals')?<strong className="leader-name">{top('goals')}</strong>:<span className="summary-empty">Sem gols</span>}</div><div className="stat"><div className="stat-label"><Handshake size={18} aria-hidden="true"/> Garçom</div>{top('assists')?<strong className="leader-name">{top('assists')}</strong>:<span className="summary-empty">Sem assistências</span>}</div></div>
           <section className="panel"><h3>Classificação dos times</h3><p className="hint">Vitória: 3 pontos · Empate: 1 ponto. Resultados parciais contam durante o jogo. Desempate: saldo de gols e gols marcados. Empates restantes são compartilhados.</p><div className="table-scroll" role="region" aria-label="Classificação dos times" tabIndex={0}><table><caption className="sr-only">Estatísticas dos times</caption><thead><tr>{['Time','PTS','J','V','E','D','GP','GC','SG'].map(h=><th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{summary!.table.map(t=><tr key={t.id}><th scope="row">{t.name}</th>{[t.points,t.played,t.wins,t.draws,t.losses,t.goalsFor,t.goalsAgainst,t.balance].map((n,i)=><td key={i}>{n}</td>)}</tr>)}</tbody></table></div><p className="hint">J: jogos · V: vitórias · E: empates · D: derrotas · GP: gols pró · GC: gols contra · SG: saldo.</p></section>
           <section className="panel"><h3>Ranking dos jogadores</h3><div className="mode-buttons" aria-label="Ranking individual"><button aria-pressed={ranking==='goals'} className={ranking==='goals'?'active':''} onClick={()=>setRanking('goals')}>Gols</button><button aria-pressed={ranking==='assists'} className={ranking==='assists'?'active':''} onClick={()=>setRanking('assists')}>Assistências</button></div>{!(showAllRanking?ranked:ranked.filter(p=>p[ranking]>0)).length&&<p className="hint">Ainda não há {ranking==='goals'?'gols':'assistências'} registrados.</p>}{(showAllRanking?ranked:ranked.filter(p=>p[ranking]>0)).map(p=><div className="ranking-result" key={p.id}><span>{p.name}</span><strong>{p[ranking]} {ranking==='goals'?(p[ranking]===1?'gol':'gols'):(p[ranking]===1?'assistência':'assistências')}</strong></div>)}{ranked.some(p=>p[ranking]===0)&&<button className="button subtle full show-ranking" aria-expanded={showAllRanking} onClick={()=>setShowAllRanking(!showAllRanking)}>{showAllRanking?'Mostrar só quem pontuou':`Ver todos os ${ranked.length} jogadores`}</button>}</section>
         </>:<section className="panel" aria-labelledby="public-teams-title"><h3 id="public-teams-title">Times da pelada</h3><p className="hint">Confira seu time e quem joga com você.</p><div className="public-rosters">{data.teams.map((t,i)=><article className="public-team" key={t.id}><h4><span className="team-marker" data-team={i%4}><Users size={18} aria-hidden="true"/></span>{t.name}</h4><p>{t.playerIds.length} jogadores</p><ul>{t.playerIds.map(id=><li key={id}>{data.players.find(p=>p.id===id)?.name||'Jogador indisponível'}</li>)}</ul></article>)}</div></section>}

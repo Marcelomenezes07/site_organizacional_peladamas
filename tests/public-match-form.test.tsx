@@ -105,3 +105,21 @@ it('keeps previous games in a collapsed section of this same pelada',async()=>{
  expect(document.querySelector('.featured')?.textContent).toContain('Partida 2');
  expect(history.querySelector('.match-card')?.textContent).toContain('Partida 1');
 });
+
+it('opens and saves a match when randomUUID is unavailable on local HTTP',async()=>{
+ const original=Object.getOwnPropertyDescriptor(crypto,'randomUUID');
+ Object.defineProperty(crypto,'randomUUID',{configurable:true,value:undefined});
+ try{
+  await click('Criar partida');
+  const editor=document.querySelector('.match-editor')!;
+  expect(editor).not.toBeNull();expect(document.activeElement).toBe(editor.querySelector('select'));
+  await click('Criar partida',editor);
+  expect(game.matches).toHaveLength(1);
+  expect(game.matches[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+ }finally{if(original)Object.defineProperty(crypto,'randomUUID',original);else delete (crypto as Partial<Crypto>).randomUUID;}
+});
+it('shows small empty-state messages instead of leader names before any goals',async()=>{
+ await click('Resumo');
+ expect(document.querySelectorAll('.summary-empty')).toHaveLength(3);
+ expect(document.querySelectorAll('.leader-name')).toHaveLength(0);
+});
