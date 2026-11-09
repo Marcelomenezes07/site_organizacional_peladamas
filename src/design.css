@@ -362,3 +362,9 @@ footer{padding:24px 0}.footer-mark{font-size:14px;opacity:1}.public-footer{paddi
  .header .connection{font-size:12px;min-width:44px;min-height:44px;padding:10px}
 }
 @media(max-width:359px){.header-inner{padding:0 14px}.header .brand{gap:8px}.header .brand h1{font-size:22px}}
+
+/* Keep each team's marker consistent in matches and rosters. */
+.team-marker[data-team='0'],.featured .team-marker[data-team='0']{background:#e4ecff;color:#284f91}
+.team-marker[data-team='1'],.featured .team-marker[data-team='1']{background:#fbe8db;color:#8d451a}
+.team-marker[data-team='2'],.featured .team-marker[data-team='2']{background:#e9e4ff;color:#56458b}
+.team-marker[data-team='3'],.featured .team-marker[data-team='3']{background:#fff2c9;color:#735319}
