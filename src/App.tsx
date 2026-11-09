@@ -4,9 +4,9 @@ import { useConfirmation } from './useConfirmation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowDownToLine, ArrowRight, Check, CheckCircle2, ChevronDown, Clipboard,
-  Cloud, CloudOff, Copy, FilePlus2, FileSpreadsheet, History, Info, LoaderCircle,
+  Cloud, CloudOff, Copy, FilePlus2, History, Info, LoaderCircle,
   PencilLine, Plus, RefreshCw, RotateCcw, Search, Settings2, ShieldAlert, Shuffle,
-  Sparkles, Trash2, Trophy, Users, X
+  Trash2, Trophy, Users, X
 } from 'lucide-react';
 import { formatStars, matchPlayer, normalize, parseWhatsAppList, sortTeams, starOptions, validStars, type Team, type DrawMode } from '../lib/logic';
 import { peladaToCsv, rankingToCsv } from '../lib/csv';
@@ -70,6 +70,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const [newAliases,setNewAliases]=useState('');
   const [newStars,setNewStars]=useState(3);
   const [showAdd,setShowAdd]=useState(false);
+  const [editingPlayer,setEditingPlayer]=useState<string|null>(null);
   const [sourceNumber,setSourceNumber]=useState<number|null>(null);
   const [listText,setListText]=useState('');
   const [preview,setPreview]=useState<PreviewPlayer[]>([]);
@@ -101,7 +102,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const setRankingView=async(next:string)=>{
     if(next===view)return;
     if(dirtyRef.current&&!await confirm('Descartar alterações que ainda não foram salvas?'))return;
-    currentViewRef.current=next;setView(next);
+    currentViewRef.current=next;setView(next);setEditingPlayer(null);
     setDraft(clonePlayers(state?currentList(state,next)?.players||[]:[]));setDirty(false);dirtyRef.current=false;setSearch('');setShowAdd(false);setFeedback('');
   };
   const modifyPlayer=(id:string,changes:Partial<Player>)=>mark(draft.map(p=>p.id===id?{...p,...changes}:p));
@@ -217,7 +218,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
       <div className="header-decoration" aria-hidden="true" />
     </header>
     <main className="main">
-      <div className="topline"><button className="refresh" onClick={async()=>{if(dirty&&!await confirm('Sair sem salvar as alterações?'))return;void onLogout().catch(e=>showMessage(e.message));}}>Sair</button><span><span className="online-indicator"/> Administração</span><button className="refresh" onClick={()=>void refresh()} title="Atualizar dados"><RefreshCw size={15}/> Atualizar</button></div>
+      <div className="topline"><button className="refresh" onClick={async()=>{if(dirty&&!await confirm('Sair sem salvar as alterações?'))return;void onLogout().catch(e=>showMessage(e.message));}}>Sair</button><button className="refresh" onClick={()=>void refresh()} title="Atualizar dados"><RefreshCw size={15}/> Atualizar</button></div>
 
       <nav className="tabs" aria-label="Áreas do Peladamas">
         <button type="button" aria-pressed={tab==='ranking'} onClick={()=>{setTab('ranking');setFeedback('');}} className={'tab '+(tab==='ranking'?'selected':'')}><Trophy size={18}/> Ranking geral</button>
@@ -228,7 +229,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
       {loading?<div className="loading-screen"><LoaderCircle size={30} className="spinner"/><p>Carregando rankings...</p></div>:
       !state?<div className="panel"><Empty icon={<CloudOff size={28}/>} heading="Não foi possível acessar os dados" detail="Confira se a API está funcionando e se o armazenamento foi configurado."/><button className="button primary full" onClick={()=>void refresh(true)}>Tentar novamente</button>{feedback&&<p className="error-text">{feedback}</p>}</div>:
       tab==='ranking'?<>
-        <div className="section-top"><div><h2>Ranking de estrelas</h2></div><span className="label-tag"><History size={13}/> Histórico</span></div>
+        <div className="section-top"><div><h2>Ranking de estrelas</h2></div></div>
         <div className="panel selector-card"><label htmlFor="rankingSelector" className="form-label">Visualizar ranking</label>
           <div className="select-wrap"><select id="rankingSelector" className="main-select" value={view} onChange={e=>setRankingView(e.target.value)}>
             <option value="geral">⭐ Geral — ranking principal</option>
@@ -238,29 +239,28 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           {view!=='geral'&&<button className="button danger" disabled={saving} onClick={()=>void deletePelada(Number(view))}><Trash2 size={16}/> Excluir Pelada {view}</button>}
         </div>
         {view!=='geral'&&<PeladaLinks key={view} number={Number(view)} version={state.peladas.find(p=>p.number===Number(view))?.etag}/>}
-        <div className="stat-grid">
-          <div className="stat"><div className="stat-icon"><Users size={18}/></div><div className="stat-number">{draft.length}</div><div className="stat-label">Jogadores</div></div>
-          <div className="stat"><div className="stat-icon"><Sparkles size={18}/></div><div className="stat-number">{formatStars(rankAvg)}</div><div className="stat-label">Média de estrelas</div></div>
-          <div className="stat"><div className="stat-icon"><FileSpreadsheet size={18}/></div><div className="stat-number">{view==='geral'?'GERAL':`#${view}`}</div><div className="stat-label">Ranking selecionado</div></div>
-        </div>
+        <p className="context-line">{draft.length} jogadores <span aria-hidden="true">·</span> Média {formatStars(rankAvg)} estrelas</p>
         <div className="panel rank-panel">
-          <div className="panel-heading"><div><h3>{view==='geral'?'Todos os craques':`Jogadores da Pelada ${view}`}</h3><p>Edite os campos e salve ao terminar. Apelidos podem ser separados por |.</p></div>
+          <div className="panel-heading"><div><h3>{view==='geral'?'Jogadores':`Jogadores da Pelada ${view}`}</h3><p>Edite e salve ao terminar.</p></div>
             <button className="icon-button" title="Baixar o CSV" aria-label="Baixar CSV" onClick={()=>{
               const p=view==='geral'?rankingToCsv(draft):peladaToCsv({players:draft,createdAt:state.peladas.find(p=>String(p.number)===view)?.createdAt||''});
               exportCSV(view==='geral'?'ranking_geral.csv':`pelada_${view}.csv`,p);
             }}><ArrowDownToLine size={19}/></button></div>
+          {dirty&&<div className="ranking-save"><div className="save-area"><button className="button subtle" disabled={!dirty||saving} onClick={discard}><RotateCcw size={16}/> Descartar</button><button className="button primary" disabled={!dirty||saving} onClick={()=>void saveRanking()}>{saving?<LoaderCircle className="spinner" size={17}/>:<Check size={17}/>} Salvar alterações</button></div>
+            <p className="save-note attention">Alterações ainda não salvas.</p></div>}
           <div className="search-wrap"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar jogador..." aria-label="Buscar jogador" /></div>
           <div role="table" aria-label="Ranking dos jogadores"><div className="table-header" role="row"><span role="columnheader">#</span><span role="columnheader">JOGADOR</span><span role="columnheader">ESTRELAS</span><span role="columnheader" aria-label="Ações"></span></div>
           <div className="ranking-rows" role="rowgroup">
             {rankRows.length===0?<div role="row"><div role="cell" aria-colspan={4}><Empty icon={<Search size={26}/>} heading="Nenhum jogador" detail="Experimente outro nome de busca."/></div></div>:rankRows.map(p=>
-              <div className="ranking-row" key={p.id} role="row">
+              <div className={'ranking-row'+(editingPlayer===p.id?' editing-player':'')} key={p.id} role="row">
                 <span className="rank-position" role="cell">{stableRanking.findIndex(x=>x.id===p.id)+1}</span>
-                <div className="player-info" role="cell">
-                  {view==='geral'?<label className="ranking-field"><span>Nome</span><input className="inline-name" value={p.name} onChange={e=>modifyPlayer(p.id,{name:e.target.value})} aria-label={`Nome de ${p.name}`}/></label>:<strong>{p.name}</strong>}
-                  {view==='geral'?<label className="ranking-field"><span>Apelidos</span><input className="alias" value={p.aliases} placeholder="Apelidos (separar por |)" onChange={e=>modifyPlayer(p.id,{aliases:e.target.value})} aria-label={`Apelidos de ${p.name}`}/></label>:<span className="alias-static">Pelada {view}</span>}
+                <div className="player-info" role="cell" id={`player-${p.id}`}>
+                  {view==='geral'&&editingPlayer===p.id?<label className="ranking-field"><span>Nome</span><input className="inline-name" value={p.name} onChange={e=>modifyPlayer(p.id,{name:e.target.value})} aria-label={`Nome de ${p.name}`}/></label>:<strong>{p.name}</strong>}
+                  {view==='geral'&&editingPlayer===p.id?<label className="ranking-field"><span>Apelidos</span><input className="alias" value={p.aliases} placeholder="Apelidos (separar por |)" onChange={e=>modifyPlayer(p.id,{aliases:e.target.value})} aria-label={`Apelidos de ${p.name}`}/></label>:<span className="alias-static">{view==='geral'?p.aliases:`Pelada ${view}`}</span>}
+                  {view==='geral'&&editingPlayer===p.id&&<button className="button subtle remove-player" onClick={()=>void deletePlayer(p.id)}><Trash2 size={16}/> Excluir jogador</button>}
                 </div>
                 <div role="cell" className="ranking-rating"><span className="touch-label">Estrelas</span><StarsSelect value={p.stars} ariaLabel={`Estrelas de ${p.name}`} onChange={s=>modifyPlayer(p.id,{stars:s})}/></div>
-                <div role="cell" className="ranking-actions"><button className="delete-button" onClick={()=>deletePlayer(p.id)} aria-label={`Excluir ${p.name}`} title="Excluir deste ranking"><Trash2 size={17}/></button></div>
+                <div role="cell" className="ranking-actions">{view==='geral'?<button className="icon-button" aria-label={`${editingPlayer===p.id?'Fechar edição de':'Editar'} ${p.name}`} aria-expanded={editingPlayer===p.id} aria-controls={`player-${p.id}`} onClick={()=>setEditingPlayer(editingPlayer===p.id?null:p.id)}>{editingPlayer===p.id?<X size={17}/>:<PencilLine size={17}/>}</button>:<button className="delete-button" onClick={()=>deletePlayer(p.id)} aria-label={`Excluir ${p.name}`} title="Excluir deste ranking"><Trash2 size={17}/></button>}</div>
               </div>)}
           </div></div>
           {view==='geral'&&<div className="add-area">{showAdd?<form onSubmit={e=>{e.preventDefault();addPlayer();}} className="add-form">
@@ -268,17 +268,14 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
             <input value={newAliases} onChange={e=>setNewAliases(e.target.value)} placeholder="Apelidos separados por | (opcional)" maxLength={180}/>
             <div className="button-row"><button className="button subtle" type="button" onClick={()=>setShowAdd(false)}>Cancelar</button><button className="button primary" type="submit"><Plus size={16}/> Adicionar</button></div>
           </form>:<button className="add-button" onClick={()=>setShowAdd(true)}><Plus size={17}/> Adicionar jogador</button>}</div>}
-          <div className="save-area"><button className="button subtle" disabled={!dirty||saving} onClick={discard}><RotateCcw size={16}/> Descartar</button><button className="button primary" disabled={!dirty||saving} onClick={()=>void saveRanking()}>{saving?<LoaderCircle className="spinner" size={17}/>:<Check size={17}/>} Salvar alterações</button></div>
-          <p className={'save-note '+(dirty?'attention':'')}>{dirty?'● Alterações ainda não salvas.':<><CheckCircle2 size={14}/> As alterações salvas aparecem em todos os celulares.</>}</p>
+
           {feedback&&<div role="status" aria-live="polite" className={'feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
         </div>
       </>:<>
-        <div className="organization-heading"><h2>Organizar pelada<span className="heading-dot">.</span></h2><p>Da lista de jogadores aos times prontos para jogar.</p></div>
+        <div className="organization-heading"><h2>Organizar pelada</h2></div>
         <div className="mode-buttons" aria-label="Organização"><button aria-pressed={mode==='criar'} className={mode==='criar'?'active':''} onClick={()=>{setMode('criar');setFeedback('');}}><FilePlus2 size={17}/> Criar pelada</button><button aria-pressed={mode==='sortear'} className={mode==='sortear'?'active':''} onClick={()=>{setMode('sortear');setFeedback('');}}><Shuffle size={17}/> Peladas criadas</button></div>
-        <ol className="organization-path" aria-label="Etapas da organização"><li aria-current={mode==='criar'?'step':undefined}><span>1</span> Criar lista</li><li aria-current={mode==='sortear'?'step':undefined}><span>2</span> Sortear times</li><li><span>3</span> Compartilhar</li></ol>
         {mode==='criar'?<>
-          <div className="panel creation-intro"><div className="step-number">01</div><div><span className="eyebrow">PRIMEIRO PASSO</span><h3>Cole a lista do WhatsApp</h3><p>Reconhecemos os nomes automaticamente pelo ranking e apelidos.</p></div></div>
-          <div className="panel"><label className="form-label" htmlFor="whatslist">Jogadores convocados</label>
+          <div className="panel"><div className="panel-heading"><div><h3>Cole a lista do WhatsApp</h3><p>Vamos reconhecer os nomes e apelidos do ranking.</p></div></div><label className="form-label" htmlFor="whatslist">Jogadores convocados</label>
             <textarea id="whatslist" className="whatsapp-textarea" value={listText} onChange={e=>{setListText(e.target.value);setPreview([]);}} placeholder={'Peladamas quarta 21h:\n\n01. Jogador Á ✅\n02. Jogador 02 ✅\n03. Jogador 03 ✅\n04. Jogador 04 ✅\n05. Jogador 08 ✅'} rows={9}/>
             <div className="hint"><Info size={15}/> Aceita mensagens numeradas, emojis e marcações de presença. Para na “Lista de espera”.</div>
             <button className="button primary full" onClick={analyze}><Search size={17}/> Reconhecer jogadores <ArrowRight size={16}/></button>
@@ -286,7 +283,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           {preview.length>0&&<div className="panel preview-panel">
             <div className="panel-heading"><div><span className="eyebrow">PASSO 02</span><h3>Revisar Pelada {countNext}</h3><p>{preview.length} jogadores encontrados · ajuste antes de criar.</p></div><span className="label-tag">{preview.length} <Users size={13}/></span></div>
             {unknownCount>0&&<div className="notice"><ShieldAlert size={18}/><span><strong>{unknownCount} nome(s) não encontrado(s) no ranking.</strong> Amarelo: nota provisória. Verde: nota ajustada. Ao criar a pelada, uma única pergunta permite adicionar todos os novos nomes ao Geral.</span></div>}
-            <div className="preview-players">{preview.map(p=><div key={p.id} className={'preview-row'+(p.unmatched?(p.reviewed?' newcomer-reviewed':' newcomer-pending'):'')}><div className="preview-name"><input value={p.name} aria-label="Nome do convocado" onChange={e=>setPreview(old=>old.map(x=>x.id===p.id?{...x,name:e.target.value}:x))}/>{p.unmatched&&<small>{p.reviewed?'Novo · nota ajustada':'Novo · nota provisória'}</small>}</div><StarsSelect value={p.stars} ariaLabel={`Nota de ${p.name}`} onChange={n=>setPreview(old=>old.map(x=>x.id===p.id?{...x,stars:n,reviewed:true}:x))}/><button className="delete-button" title="Remover" onClick={()=>setPreview(old=>old.filter(x=>x.id!==p.id))}><X size={17}/></button></div>)}</div>
+            <div className="preview-players">{preview.map(p=><div key={p.id} className={'preview-row'+(p.unmatched?(p.reviewed?' newcomer-reviewed':' newcomer-pending'):'')}><div className="preview-name"><input value={p.name} aria-label="Nome do convocado" onChange={e=>setPreview(old=>old.map(x=>x.id===p.id?{...x,name:e.target.value}:x))}/>{p.unmatched&&<small>{p.reviewed?'Novo · nota ajustada':'Novo · nota provisória'}</small>}</div><StarsSelect value={p.stars} ariaLabel={`Nota de ${p.name}`} onChange={n=>setPreview(old=>old.map(x=>x.id===p.id?{...x,stars:n,reviewed:true}:x))}/><button className="delete-button" title="Remover" aria-label={`Remover ${p.name} da lista`} onClick={()=>setPreview(old=>old.filter(x=>x.id!==p.id))}><X size={17}/></button></div>)}</div>
             <button className="button primary full" disabled={saving||preview.length<4||preview.some(p=>!p.name.trim())||new Set(preview.map(p=>normalize(p.name))).size!==preview.length} onClick={()=>void createPelada()}>{saving?<LoaderCircle size={17} className="spinner"/>:<CheckCircle2 size={17}/>} Criar Pelada {countNext} e ir para o sorteio</button>
             <p className="help-center">A lista será salva. Em seguida, confira os jogadores e sorteie os times.</p>
           </div>}
@@ -294,17 +291,16 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           {!activePelada?<div className="panel"><Empty icon={<FilePlus2 size={28}/>} heading="Ainda não há peladas" detail="Crie a primeira pelada colando a lista do WhatsApp."/><button className="button primary full" onClick={()=>setMode('criar')}><Plus size={17}/> Criar primeira pelada</button></div>:<>
             <PeladaLinks key={activePelada.number} number={activePelada.number} version={activePelada.etag}/>
             <div className="panel selector-card"><label className="form-label" htmlFor="sourceSelect">Escolha a pelada</label><div className="select-wrap"><select id="sourceSelect" className="main-select" value={activePelada.number} onChange={e=>selectPelada(Number(e.target.value))}>{state.peladas.map((p,i)=><option key={p.number} value={p.number}>{i===0?'Última — ':''}Pelada {p.number} · {p.players.length} jogadores</option>)}</select><ChevronDown size={17}/></div>
-            <div className="hint"><History size={15}/> O sorteio e o link abaixo pertencem à pelada selecionada.</div></div>
-            <div className="stat-grid"><div className="stat"><div className="stat-icon"><Users size={18}/></div><div className="stat-number">{activePelada.players.length}</div><div className="stat-label">Convocados</div></div><div className="stat"><div className="stat-icon"><Trophy size={18}/></div><div className="stat-number">{Math.max(2,Math.ceil(activePelada.players.length/perTeam))}</div><div className="stat-label">Times</div></div><div className="stat"><div className="stat-icon"><Sparkles size={18}/></div><div className="stat-number">{formatStars(activePelada.players.reduce((s,p)=>s+p.stars,0))}</div><div className="stat-label">Total de estrelas</div></div></div>
+            <div className="hint"><History size={15}/> O link acima e o sorteio usam esta pelada.</div></div>
             <details className="panel roster-review" key={`roster-${activePelada.number}`}><summary>Conferir os {activePelada.players.length} jogadores <ChevronDown size={18}/></summary><div className="panel-heading"><div><h3>Jogadores da Pelada {activePelada.number}</h3><p>Estas notas serão usadas no sorteio.</p></div><button className="icon-button" title="Baixar CSV" onClick={()=>exportCSV(`pelada_${activePelada.number}.csv`,peladaToCsv(activePelada))}><ArrowDownToLine size={19}/></button></div>
               <div className="roster-grid">{ordered(activePelada.players).map(p=><div className="roster-player" key={p.id}><span className="roster-dot"/><span>{p.name}</span><strong>{formatStars(p.stars)} ★</strong></div>)}</div>
               <div className="hint" style={{marginTop:14}}><PencilLine size={15}/> Para corrigir as estrelas, selecione esta pelada na aba Ranking.</div>
             </details>
             <div className="panel draw-settings"><h3 className="settings-title"><Settings2 size={19}/> Sortear times da Pelada {activePelada.number}</h3>
               <div className="setting-row"><label htmlFor="sizeInput">Jogadores por time</label><div className="select-wrap small"><select id="sizeInput" value={perTeam} onChange={e=>{setPerTeam(Number(e.target.value));setTeams(null);}}>{[4,5,6,7,8,9,10,11].map(n=><option key={n} value={n}>{n}</option>)}</select><ChevronDown size={15}/></div></div>
-              <div className="draw-mode"><label className="form-label" htmlFor="drawMode">Como equilibrar os times</label><select id="drawMode" className="main-select" value={drawMode} onChange={e=>{setDrawMode(e.target.value as DrawMode);setTeams(null);}}><option value="balanced">Equilíbrio geral (recomendado)</option><option value="tiers">Por faixas de habilidade</option></select><p className="hint">{drawMode==='balanced'?'Busca médias próximas e distribui os jogadores mais fortes entre os times.':'Dá mais peso à distribuição das faixas: até 2, de 2,5 a 3,5 e de 4 a 5 estrelas, mantendo as médias próximas.'}</p></div>
-              <div className="hint"><Info size={15}/> Considera apenas os convocados, sem regras fixas por nome. Todos participam; se sobrarem jogadores, os times terão tamanhos diferentes e o equilíbrio será calculado pela média.</div>
-              <button className="button primary full big-sort" disabled={saving} onClick={()=>void drawTeams()}><Shuffle size={19}/> {saving?'Salvando sorteio…':teams?'Sortear novamente':'Sortear times'}</button><p className="hint">Ao sortear, os times são salvos automaticamente na página pública.</p>
+              <div className="draw-mode"><label className="form-label" htmlFor="drawMode">Como equilibrar os times</label><select id="drawMode" className="main-select" value={drawMode} onChange={e=>{setDrawMode(e.target.value as DrawMode);setTeams(null);}}><option value="balanced">Equilíbrio geral (recomendado)</option><option value="tiers">Por faixas de habilidade</option></select><details className="inline-help"><summary>Como funciona o equilíbrio</summary><p className="hint">{drawMode==='balanced'?'Busca médias próximas e distribui os jogadores mais fortes entre os times.':'Dá mais peso à distribuição das faixas: até 2, de 2,5 a 3,5 e de 4 a 5 estrelas, mantendo as médias próximas.'}</p>
+              <div className="hint"><Info size={15}/> Considera apenas os convocados, sem regras fixas por nome. Todos participam; se sobrarem jogadores, os times terão tamanhos diferentes e o equilíbrio será calculado pela média.</div></details></div>
+              <button className="button primary full big-sort" disabled={saving} onClick={()=>void drawTeams()}><Shuffle size={19}/> {saving?'Salvando sorteio…':teams?'Sortear novamente':'Sortear times'}</button><p className="hint">{Math.max(2,Math.ceil(activePelada.players.length/perTeam))} times previstos · O sorteio é salvo automaticamente.</p>
             </div>
             {teams&&<div className="results"><div className="results-heading"><div><span className="eyebrow">RESULTADO DO SORTEIO</span><h3>Times da Pelada {activePelada.number}</h3></div><span className="result-tag"><CheckCircle2 size={14}/> {drawMode==='balanced'?'Equilíbrio geral':'Por faixas'}</span></div>
               <p className="hint">Diferença entre médias: {formatStars(Math.max(...teams.map(t=>teamTotal(t)/t.length))-Math.min(...teams.map(t=>teamTotal(t)/t.length)))} ★ · O resultado depende das notas informadas.</p><div className="teams-grid">{teams.map((team,i)=><div className="team-card" key={i}><div className="team-head"><strong><span>{teamEmojis[i%teamEmojis.length]}</span> TIME {i+1}</strong><span>{formatStars(teamTotal(team))} ⭐</span></div><div className="team-body">{team.map((p,j)=><div className="team-member" key={p.id}><span><small>{String(j+1).padStart(2,'0')}</small>{p.name}</span><em>{formatStars(p.stars)}</em></div>)}</div><div className="team-footer">Média: <strong>{formatStars(teamTotal(team)/team.length)} ⭐</strong></div></div>)}</div>
@@ -316,7 +312,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
         </>}
         {feedback&&<div role="status" aria-live="polite" className={'feedback bottom-feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
       </>}
-      <footer><div className="footer-mark"><span aria-hidden="true">⚽</span> <strong>PELA<span>DAMAS</span></strong></div><p>Feito pra pelada ser justa. Salvo na nuvem, para todo mundo.</p></footer>
+      <footer><div className="footer-mark"><span aria-hidden="true">⚽</span> <strong>PELA<span>DAMAS</span></strong></div></footer>
     </main>
   </div>;
 }
