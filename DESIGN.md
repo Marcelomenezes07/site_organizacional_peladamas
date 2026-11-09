@@ -25,3 +25,7 @@ Testes e limites estão no relatório. `main` faz deploy automático e só receb
 ## Ajuste de identidade verde
 
 Cabeçalho verde escuro `#123f30`, marca branca/verde claro e controles de conexão com contraste adequado. Ações primárias e botões de adicionar gol usam verde preenchido; salvar, confirmar, criar e sortear compartilham esse padrão. Controles secundários e superfícies seguem discretos. Estrutura, densidade, tipografia e interações da revisão limpa permanecem.
+
+## Elementos visuais preservados a pedido do usuário
+
+Cabeçalho restaurado conforme a main: gradiente #102f27 → #194b39, borda verde, logo original e tamanhos responsivos. Placar volta a mostrar as linhas do campo e os marcadores verde-claros. Jogadores retomam o contraste alternado; acesso à página da pelada recebe botão e moldura verde-claros. As melhorias de interação e simplicidade permanecem. Antes de aplicar qualquer outra proposta visual, apresentá-la ao usuário para aprovação.

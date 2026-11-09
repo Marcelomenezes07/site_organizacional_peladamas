@@ -332,3 +332,33 @@ footer{padding:24px 0}.footer-mark{font-size:14px;opacity:1}.public-footer{paddi
  .rank-panel .editing-player .ranking-actions{grid-row:2}
  .rank-panel .ranking-save .button{font-size:13px;padding:10px;min-height:44px}
 }
+
+/* User-approved identity restoration, using main as the header reference. */
+.header{height:96px;background:linear-gradient(110deg,#102f27,#194b39);border-bottom:3px solid #73bc87;color:#fff}
+.header-inner{max-width:1120px;padding:0 32px}
+.header .brand{gap:12px}
+.header .brand-icon{width:44px;height:44px;border:1px solid #759b84;border-radius:50%;background:#ffffff0d;color:#bde7c8;font-size:28px}
+.header .brand h1{font-family:'Outfit',sans-serif;font-size:28px;font-weight:850;letter-spacing:-.8px;color:#fff}
+.header .brand h1 span{color:#a7e2b7}
+.header .brand p{font-size:12px;font-weight:800;letter-spacing:.2px;text-transform:none;color:#c4d8ca;margin-top:7px}
+.header .connection,.header .connection:hover{min-height:44px;padding:10px 14px;background:#214c3c;border:1px solid #527e66;color:#e4f4e9;font-size:13px;font-weight:650;gap:9px;border-radius:10px}
+.header .connection.disconnected{color:#ffe9c5;background:#563e1e;border-color:#876337}
+.featured .scoreboard{position:relative;isolation:isolate;background:linear-gradient(125deg,#102f27,#1c503c);box-shadow:inset 0 1px 0 #ffffff18}
+.featured .scoreboard::before{content:'';position:absolute;inset:12px;border:1px solid #ffffff13;border-radius:8px;pointer-events:none;z-index:-1}
+.featured .scoreboard::after{content:'';position:absolute;left:50%;top:50%;width:70px;height:70px;border:1px solid #ffffff13;border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:-1}
+.featured .score-number{text-shadow:0 4px 14px #001b2140}
+.featured .team-marker{display:grid;background:#2e5b48;color:#cfe9d7}
+.featured .scoreboard h3{color:#e1eee5}
+.public-team li{padding-left:12px;padding-right:12px}
+.public-team li:nth-child(even){background:#f5f8f5!important}
+.public-team li:hover{background:#eaf3e9!important}
+.share-pelada.ready{background:#edf6ee;border-color:#b0cdb7}
+.share-pelada a.button{background:#e3f3e7;border-color:#b0cdb7;color:#165534}
+.share-pelada a.button:hover{background:#d5ebdb}
+@media(max-width:620px){
+ .header{height:86px}.header-inner{padding:0 20px}
+ .header .brand-icon{width:40px;height:40px}.header .brand h1{font-size:24px}
+ .header .brand p{font-size:11px;margin-top:6px;letter-spacing:0}
+ .header .connection{font-size:12px;min-width:44px;min-height:44px;padding:10px}
+}
+@media(max-width:359px){.header-inner{padding:0 14px}.header .brand{gap:8px}.header .brand h1{font-size:22px}}
