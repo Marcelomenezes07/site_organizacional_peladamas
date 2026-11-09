@@ -352,9 +352,9 @@ footer{padding:24px 0}.footer-mark{font-size:14px;opacity:1}.public-footer{paddi
 .public-team li{padding-left:12px;padding-right:12px}
 .public-team li:nth-child(even){background:#f5f8f5!important}
 .public-team li:hover{background:#eaf3e9!important}
-.share-pelada.ready{background:#edf6ee;border-color:#b0cdb7}
-.share-pelada a.button{background:#e3f3e7;border-color:#b0cdb7;color:#165534}
-.share-pelada a.button:hover{background:#d5ebdb}
+.share-pelada.ready{background:var(--surface);border-color:#b0cdb7}
+.share-pelada a.button{background:#d2e5d7;border-color:#a5c5ae;color:#234f35}
+.share-pelada a.button:hover{background:#c4ddcc}
 @media(max-width:620px){
  .header{height:86px}.header-inner{padding:0 20px}
  .header .brand-icon{width:40px;height:40px}.header .brand h1{font-size:24px}
