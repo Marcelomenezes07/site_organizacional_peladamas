@@ -214,3 +214,25 @@ footer{padding:32px 0;color:var(--muted)}footer p{font-size:12px;color:var(--mut
 @media(prefers-reduced-motion:reduce){.button:hover:not(:disabled),.button:active:not(:disabled){transform:none}}
 
 .result-tag{color:#165534;background:#e3f3e7}
+
+/* Touch editing: readable fields, full-width identity and stable row positions. */
+.ranking-field{display:flex;flex-direction:column;gap:6px;min-width:0;width:100%}
+.ranking-field>span{font-size:12px;font-weight:650;color:var(--muted)}
+.ranking-field input{width:100%;min-width:0;min-height:48px;font-size:16px;border:1px solid var(--line);border-radius:8px;background:var(--soft);padding:10px 12px}
+.ranking-row .player-info{gap:12px}.ranking-row .stars-select{min-height:48px;font-size:16px}
+.ranking-row .delete-button{width:48px;min-width:48px;min-height:48px}
+.touch-label{display:none}
+@media(max-width:700px),(pointer:coarse){
+ .rank-panel .table-header{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+ .rank-panel .ranking-rows{max-height:none;overflow:visible}
+ .rank-panel .ranking-row{grid-template-columns:32px minmax(0,1fr) 48px;gap:16px 12px;padding:24px 4px;align-items:start}
+ .rank-panel .rank-position{grid-column:1;grid-row:1;padding-top:27px;font-size:15px}
+ .rank-panel .player-info{grid-column:2 / 4;grid-row:1;min-width:0}
+ .rank-panel .ranking-rating{grid-column:2;grid-row:2;display:flex;align-items:center;gap:12px;min-width:0}
+ .rank-panel .ranking-rating .stars-select{width:100%;max-width:150px;flex:1;min-width:0;padding:10px}
+ .rank-panel .touch-label{display:block;color:var(--muted);font-size:14px;font-weight:650}
+ .rank-panel .ranking-actions{grid-column:3;grid-row:2}
+ .rank-panel .ranking-field input{font-size:16px;min-height:48px}
+ .rank-panel .save-area{display:flex;flex-wrap:wrap;gap:12px}
+ .rank-panel .save-area .button{min-height:48px;flex:1;white-space:normal}
+}
