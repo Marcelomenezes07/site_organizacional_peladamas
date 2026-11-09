@@ -1,6 +1,6 @@
 /* Design test: the existing green identity, with a shared, accessible system. */
 :root {
-  --ink:#24352e; --muted:#59685f; --green:#176747; --green-hover:#105238;
+  --ink:#24352e; --muted:#59685f; --green:#08764f; --green-hover:#065b3d;
   --forest:#203f32; --mint:#edf4ef; --surface:#fff; --canvas:#f6f7f5;
   --soft:#f7f9f6; --line:#dce3dc; --danger:#a52c37; --focus:#145bd6;
   --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
@@ -175,9 +175,9 @@ footer{padding:32px 0;color:var(--muted)}footer p{font-size:12px;color:var(--mut
 
 /* Revision 2: task order and tactile details, preserving the original mark. */
 :root{--ease-out:cubic-bezier(.16,1,.3,1);--elevation:0 8px 28px #153b2512;--press-depth:0 2px 0 #053f2b}
-.header{position:relative;background:var(--surface);border-bottom:1px solid var(--line);height:80px;color:var(--ink)}
+.header{position:relative;background:#123f30;border-bottom:1px solid #2e634a;height:80px;color:#fff}
 .brand-icon{font-size:28px;border-radius:50%;background:#ffffff0d;border-color:#759b84}
-.brand h1{font-weight:750;color:var(--ink)}.footer-mark>span{font-size:24px}
+.brand h1{font-weight:750;color:#fff}.footer-mark>span{font-size:24px}
 .tab.selected{box-shadow:0 3px 8px #153b2514}.tab.selected::after{display:none}
 .button{transition:background 180ms var(--ease-out),border-color 180ms var(--ease-out),transform 180ms var(--ease-out)}
 .button.primary{box-shadow:none!important}
@@ -247,11 +247,11 @@ footer{padding:32px 0;color:var(--muted)}footer p{font-size:12px;color:var(--mut
 @media(max-width:620px){.public-pelada .summary-empty{margin-top:0;text-align:right}}
 
 /* Quiet operating surfaces: one action hierarchy and one type family. */
-.brand h1 span{color:var(--green)}.brand p{color:var(--muted);font-weight:500}
+.brand h1 span{color:#a5e5bc}.brand p{color:#c9e4d3;font-weight:500}
 .brand-icon{background:transparent;border:0;font-size:28px}
-.connection{background:var(--soft);color:var(--muted);border-color:var(--line);font-weight:500}
+.connection{background:#204f3c;color:#e2f3e8;border-color:#527d63;font-weight:500}
 .connection.disconnected{background:#fff4e3;color:#795016;border-color:#ead8bb}
-.header .connection:hover{background:#edf2ed}
+.header .connection:hover{background:#2b6049}
 .main{padding-top:24px}.public-pelada .main{padding-top:28px}
 .topline{margin-bottom:12px}.topline .refresh{font-weight:500}
 .section-top h2,.organization-heading h2{font-size:26px;font-weight:650;letter-spacing:-.02em}
@@ -276,8 +276,8 @@ footer{padding:32px 0;color:var(--muted)}footer p{font-size:12px;color:var(--mut
 .match-card.featured{border-color:var(--line)}.matches-toolbar h3{font-size:20px}
 .featured .score-number{font-size:64px;font-weight:650}.scoreboard .score-side h3{font-size:16px}
 .featured .team-marker{display:none}.featured .score-divider{padding-top:24px}
-.match-card .goal-actions .button{background:var(--soft);color:var(--green);border-color:var(--line)}
-.match-card .goal-actions .button:hover:not(:disabled){background:var(--mint)}
+.match-card .goal-actions .button{background:var(--green);color:#fff;border-color:var(--green)}
+.match-card .goal-actions .button:hover:not(:disabled){background:var(--green-hover)}
 .match-notice{background:var(--soft);color:var(--green);border-color:var(--line);font-size:14px}
 .match-notice.error{background:#fff4f2;color:var(--danger);border-color:#e6c7c3}
 .empty-match{padding:28px 20px;border:1px solid var(--line);text-align:left;border-radius:12px}
@@ -290,7 +290,7 @@ footer{padding:32px 0;color:var(--muted)}footer p{font-size:12px;color:var(--mut
 .public-pelada .summary-empty{font-size:13px;margin-top:10px}
 .public-team h4{font-size:18px}.public-team li{background:transparent!important;font-weight:400;padding-left:0}
 .team-marker,.team-marker[data-team]{background:var(--soft);color:var(--green);box-shadow:none}
-footer{padding:24px 0}.footer-mark{font-size:14px;opacity:.85}.public-footer{padding:20px 0}.public-footer p{font-size:12px}
+footer{padding:24px 0}.footer-mark{font-size:14px;opacity:1}.public-footer{padding:20px 0}.public-footer p{font-size:12px}
 .login-card h1{font-size:28px;font-weight:600}.login-card{box-shadow:none;border:1px solid var(--line)}
 @media(max-width:620px){
  .header{height:76px}.header-inner{padding:0 16px}.brand h1{font-size:23px}.brand p{font-size:11px}
