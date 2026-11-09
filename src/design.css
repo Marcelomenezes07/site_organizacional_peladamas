@@ -366,5 +366,5 @@ footer{padding:24px 0}.footer-mark{font-size:14px;opacity:1}.public-footer{paddi
 /* Keep each team's marker consistent in matches and rosters. */
 .team-marker[data-team='0'],.featured .team-marker[data-team='0']{background:#e4ecff;color:#284f91}
 .team-marker[data-team='1'],.featured .team-marker[data-team='1']{background:#fbe8db;color:#8d451a}
-.team-marker[data-team='2'],.featured .team-marker[data-team='2']{background:#e9e4ff;color:#56458b}
+.team-marker[data-team='2'],.featured .team-marker[data-team='2']{background:#ccebd5;color:#205d35}
 .team-marker[data-team='3'],.featured .team-marker[data-team='3']{background:#fff2c9;color:#735319}
