@@ -92,3 +92,9 @@ it('permite concluir exclusões antigas e repetir limpeza que falhou',async()=>{
   expect(memory.docs.has('partidas/pelada_7_abc.json')).toBe(false);
   expect(memory.docs.has('partidas/pelada_70_abc.json')).toBe(true);
 });
+it('salva a data da pelada e rejeita datas inexistentes',async()=>{
+  expect((await handleApi('POST',{action:'createPelada',players,date:'2026-02-30'})).status).toBe(400);
+  expect(memory.docs.size).toBe(0);
+  expect((await handleApi('POST',{action:'createPelada',players,date:'2026-12-05'})).status).toBe(201);
+  expect(readCsv(memory.docs.get('peladas/pelada_1.csv')!.content).date).toBe('2026-12-05');
+});

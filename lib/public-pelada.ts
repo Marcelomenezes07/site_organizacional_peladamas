@@ -18,7 +18,7 @@ export async function handlePublicPelada(method:string,number:number,payload:unk
     const parsed=readCsv(doc.content),state=await readMatchState(number,parsed.matchFile);
     if(method==='GET'){
       const {totals}=summarize(state,parsed.players);
-      return reply(200,{pelada:{number,createdAt:parsed.createdAt,etag:doc.etag,...state,players:totals.map(({id,name,goals,assists})=>({id,name,goals,assists}))}});
+      return reply(200,{pelada:{number,createdAt:parsed.createdAt,date:parsed.date,etag:doc.etag,...state,players:totals.map(({id,name,goals,assists})=>({id,name,goals,assists}))}});
     }
     if(method!=='POST')return reply(405,{error:'Método não permitido.'});
     if(!payload||typeof payload!=='object')return reply(400,{error:'Solicitação inválida.'});

@@ -7,7 +7,7 @@ export type Player = {
   assists?:number;
 };
 export type Ranking = { players: Player[]; etag: string | null };
-export type Pelada = { number: number; createdAt: string; players: Player[]; etag: string | null };
+export type Pelada = { number: number; createdAt: string; date?: string; players: Player[]; etag: string | null };
 export type AppState = { ranking: Ranking; peladas: Pelada[]; nextPeladaNumber?:number;pendingDeletions?:number[] };
 
 // Jogadores fictícios para demonstração. Dados reais ficam somente no armazenamento privado.

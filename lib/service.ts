@@ -1,3 +1,4 @@
+import {validPeladaDate} from './pelada-date.js';
 import {readMatchState} from './public-pelada.js';
 import { readCsv, rankingToCsv, peladaToCsv } from './csv.js';
 import { starterPlayers, type AppState, type Pelada, type Player, type Ranking } from './models.js';
@@ -33,7 +34,7 @@ async function peladas(pathsOverride?:string[], pending:number[]=[]):Promise<Pel
   const docs=await Promise.all(paths.map(async path=>{
     const doc=await readDocument(path);if(!doc)return null;if(doc.content===deletedMarker){pending.push(Number(path.match(/pelada_(\d+)/)![1]));return null;}
     const parsed=readCsv(doc.content);
-    return {number:Number(path.match(/pelada_(\d+)\.csv$/)?.[1]),createdAt:parsed.createdAt,
+    return {number:Number(path.match(/pelada_(\d+)\.csv$/)?.[1]),createdAt:parsed.createdAt,date:parsed.date,
       players:checkPlayers(parsed.players,120).map(p=>({...p,goals:parsed.players.find(x=>x.id===p.id)?.goals??0,assists:parsed.players.find(x=>x.id===p.id)?.assists??0})),etag:doc.etag};
   }));
   return docs.filter(x=>x!==null).sort((a,b)=>b.number-a.number);
@@ -111,10 +112,12 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
       const matchState=await readMatchState(number,parsed.matchFile);
       if(matchState.teams.length&&(players.length!==parsed.players.length||players.some(p=>!parsed.players.some(x=>x.id===p.id))))return output(400,{error:'Os convocados não podem mudar depois de salvar os times. Você ainda pode corrigir nomes e estrelas.'});
       const preserved=players.map(p=>({...p,goals:parsed.players.find(x=>x.id===p.id)?.goals??0,assists:parsed.players.find(x=>x.id===p.id)?.assists??0}));
-      await updateDocument(path,peladaToCsv({players:preserved,createdAt:parsed.createdAt||new Date().toISOString(),matchFile:parsed.matchFile}),doc.etag);
+      await updateDocument(path,peladaToCsv({players:preserved,createdAt:parsed.createdAt||new Date().toISOString(),matchFile:parsed.matchFile,date:parsed.date}),doc.etag);
       return output(200,{ok:true});
     }
     if(data.action==='createPelada'){
+      if(data.date!==undefined&&!validPeladaDate(data.date))return output(400,{error:'Informe uma data válida para a pelada.'});
+      const date=data.date as string|undefined;
       const players=checkPlayers(data.players,120);
       if(players.length<4)throw new Error('A pelada precisa de pelo menos 4 jogadores.');
       const addIds=data.addToRankingIds??[];
@@ -123,7 +126,7 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
         const ids=await usedPeladaNumbers();
         const number=Math.max(0,...ids)+1;
         try{
-          await createDocument(peladaPath(number),peladaToCsv({players,createdAt:new Date().toISOString()}));
+          await createDocument(peladaPath(number),peladaToCsv({players,createdAt:new Date().toISOString(),date}));
           // The game is already saved. Report a partial failure without inviting a duplicate game.
           let addedToRanking=0;
           try{addedToRanking=await addToRanking(players.filter(p=>addIds.includes(p.id)));}

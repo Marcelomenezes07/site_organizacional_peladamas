@@ -3,7 +3,7 @@ export type SavedTeam={id:string;name:string;playerIds:string[]};
 export type Goal={teamId:string;scorerId:string|null;assistId:string|null;ownGoal:boolean};
 export type Match={id:string;homeId:string;awayId:string;status:'scheduled'|'finished';homeScore:number;awayScore:number;goals:Goal[]};
 export type MatchState={teams:SavedTeam[];matches:Match[]};
-export type PublicPelada=MatchState&{number:number;createdAt:string;players:PublicPlayer[];etag:string};
+export type PublicPelada=MatchState&{number:number;createdAt:string;date?:string;players:PublicPlayer[];etag:string};
 export function summarize(state:MatchState,players:Pick<PublicPlayer,'id'|'name'>[]){
   const totals=players.map(p=>({...p,goals:0,assists:0}));
   const table=state.teams.map(t=>({...t,played:0,wins:0,draws:0,losses:0,goalsFor:0,goalsAgainst:0,balance:0,points:0}));

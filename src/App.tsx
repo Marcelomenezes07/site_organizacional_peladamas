@@ -1,3 +1,4 @@
+import {todayLocal,validPeladaDate} from '../lib/pelada-date';
 import {getPelada,changePelada} from './pelada-api';
 import PeladaLinks from './PeladaLinks';
 import { useConfirmation } from './useConfirmation';
@@ -73,6 +74,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const [editingPlayer,setEditingPlayer]=useState<string|null>(null);
   const [sourceNumber,setSourceNumber]=useState<number|null>(null);
   const [listText,setListText]=useState('');
+  const [peladaDate,setPeladaDate]=useState(todayLocal);
   const [preview,setPreview]=useState<PreviewPlayer[]>([]);
   const [perTeam,setPerTeam]=useState(5);
   const [drawMode,setDrawMode]=useState<DrawMode>('balanced');
@@ -163,12 +165,13 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   };
   const createPelada=async()=>{
     if(preview.length<4||savingRef.current)return;
+    if(!validPeladaDate(peladaDate)){showMessage('Informe uma data válida para a pelada.');return;}
     const newcomers=preview.filter(p=>p.unmatched&&!matchPlayer(p.name,state?.ranking.players||[]));
     const addNewcomers=newcomers.length>0&&await confirm(`Adicionar estes ${newcomers.length} novos jogadores também ao Ranking Geral?\n\n${newcomers.map(p=>`${p.name}: ${formatStars(p.stars)} estrelas${p.reviewed?'':' (nota provisória)'}`).join('\n')}\n\nCancelar cria a pelada sem adicioná-los ao Geral.`);
     savingRef.current=true;saveGenerationRef.current++;setSaving(true);setFeedback('');
     try{
       const p=preview.map(({id,name,aliases,stars})=>({id,name,aliases,stars}));
-      const answer=await remote<{ok:boolean;number:number;addedToRanking?:number;warning?:string}>('POST',{action:'createPelada',players:p,addToRankingIds:addNewcomers?newcomers.map(p=>p.id):[]});
+      const answer=await remote<{ok:boolean;number:number;addedToRanking?:number;warning?:string}>('POST',{action:'createPelada',date:peladaDate,players:p,addToRankingIds:addNewcomers?newcomers.map(p=>p.id):[]});
       setSourceNumber(answer.number);setMode('sortear');setTeams(null);setPreview([]);setListText('');
       setFeedback(answer.warning||`Pelada ${answer.number} criada!${answer.addedToRanking?` ${answer.addedToRanking} novo(s) jogador(es) adicionado(s) ao Ranking Geral.`:' Os jogadores estão salvos e compartilhados.'}`);
     }catch(e){showMessage((e as Error).message);}
@@ -257,7 +260,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
         <div className="panel rank-panel">
           <div className="panel-heading"><div><h3>{view==='geral'?'Jogadores':`Jogadores da Pelada ${view}`}</h3><p>Edite e salve ao terminar.</p></div>
             <button className="icon-button" title="Baixar o CSV" aria-label="Baixar CSV" onClick={()=>{
-              const p=view==='geral'?rankingToCsv(draft):peladaToCsv({players:draft,createdAt:state.peladas.find(p=>String(p.number)===view)?.createdAt||''});
+              const p=view==='geral'?rankingToCsv(draft):peladaToCsv({players:draft,date:state.peladas.find(p=>String(p.number)===view)?.date,createdAt:state.peladas.find(p=>String(p.number)===view)?.createdAt||''});
               exportCSV(view==='geral'?'ranking_geral.csv':`pelada_${view}.csv`,p);
             }}><ArrowDownToLine size={19}/></button></div>
           {dirty&&<div className="ranking-save"><div className="save-area"><button className="button subtle" disabled={!dirty||saving} onClick={discard}><RotateCcw size={16}/> Descartar</button><button className="button primary" disabled={!dirty||saving} onClick={()=>void saveRanking()}>{saving?<LoaderCircle className="spinner" size={17}/>:<Check size={17}/>} Salvar alterações</button></div>
@@ -289,8 +292,9 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
         <div className="organization-heading"><h2>Organizar pelada</h2></div>
         <div className="mode-buttons" aria-label="Organização"><button aria-pressed={mode==='criar'} className={mode==='criar'?'active':''} onClick={()=>{setMode('criar');setFeedback('');}}><FilePlus2 size={17}/> Criar pelada</button><button aria-pressed={mode==='sortear'} className={mode==='sortear'?'active':''} onClick={()=>{setMode('sortear');setFeedback('');}}><Shuffle size={17}/> Peladas criadas</button></div>
         {mode==='criar'?<>
-          <div className="panel"><div className="panel-heading"><div><h3>Cole a lista do WhatsApp</h3><p>Vamos reconhecer os nomes e apelidos do ranking.</p></div></div><label className="form-label" htmlFor="whatslist">Jogadores convocados</label>
-            <textarea id="whatslist" className="whatsapp-textarea" value={listText} onChange={e=>{setListText(e.target.value);setPreview([]);}} placeholder={'Peladamas quarta 21h:\n\n01. Jogador Á ✅\n02. Jogador 02 ✅\n03. Jogador 03 ✅\n04. Jogador 04 ✅\n05. Jogador 08 ✅'} rows={9}/>
+          <div className="panel"><div className="panel-heading"><div><h3>Cole a lista do WhatsApp</h3><p>Vamos reconhecer os nomes e apelidos do ranking.</p></div></div>
+            <label className="form-label" htmlFor="peladaDate">Data da pelada</label><input id="peladaDate" type="date" min="1900-01-01" max="9999-12-31" required value={peladaDate} onChange={e=>setPeladaDate(e.target.value)} style={{marginBottom:16}}/>
+            <label className="form-label" htmlFor="whatslist">Jogadores convocados</label><textarea id="whatslist" className="whatsapp-textarea" value={listText} onChange={e=>{setListText(e.target.value);setPreview([]);}} placeholder={'Peladamas quarta 21h:\n\n01. Jogador Á ✅\n02. Jogador 02 ✅\n03. Jogador 03 ✅\n04. Jogador 04 ✅\n05. Jogador 08 ✅'} rows={9}/>
             <div className="hint"><Info size={15}/> Aceita mensagens numeradas, emojis e marcações de presença. Para na “Lista de espera”.</div>
             <button className="button primary full" onClick={analyze}><Search size={17}/> Reconhecer jogadores <ArrowRight size={16}/></button>
           </div>
@@ -298,7 +302,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
             <div className="panel-heading"><div><span className="eyebrow">PASSO 02</span><h3>Revisar Pelada {countNext}</h3><p>{preview.length} jogadores encontrados · ajuste antes de criar.</p></div><span className="label-tag">{preview.length} <Users size={13}/></span></div>
             {unknownCount>0&&<div className="notice"><ShieldAlert size={18}/><span><strong>{unknownCount} nome(s) não encontrado(s) no ranking.</strong> Amarelo: nota provisória. Verde: nota ajustada. Ao criar a pelada, uma única pergunta permite adicionar todos os novos nomes ao Geral.</span></div>}
             <div className="preview-players">{preview.map(p=><div key={p.id} className={'preview-row'+(p.unmatched?(p.reviewed?' newcomer-reviewed':' newcomer-pending'):'')}><div className="preview-name"><input value={p.name} aria-label="Nome do convocado" onChange={e=>setPreview(old=>old.map(x=>x.id===p.id?{...x,name:e.target.value}:x))}/>{p.unmatched&&<small>{p.reviewed?'Novo · nota ajustada':'Novo · nota provisória'}</small>}</div><StarsSelect value={p.stars} ariaLabel={`Nota de ${p.name}`} onChange={n=>setPreview(old=>old.map(x=>x.id===p.id?{...x,stars:n,reviewed:true}:x))}/><button className="delete-button" title="Remover" aria-label={`Remover ${p.name} da lista`} onClick={()=>setPreview(old=>old.filter(x=>x.id!==p.id))}><X size={17}/></button></div>)}</div>
-            <button className="button primary full" disabled={saving||preview.length<4||preview.some(p=>!p.name.trim())||new Set(preview.map(p=>normalize(p.name))).size!==preview.length} onClick={()=>void createPelada()}>{saving?<LoaderCircle size={17} className="spinner"/>:<CheckCircle2 size={17}/>} Criar Pelada {countNext} e ir para o sorteio</button>
+            <button className="button primary full" disabled={saving||!validPeladaDate(peladaDate)||preview.length<4||preview.some(p=>!p.name.trim())||new Set(preview.map(p=>normalize(p.name))).size!==preview.length} onClick={()=>void createPelada()}>{saving?<LoaderCircle size={17} className="spinner"/>:<CheckCircle2 size={17}/>} Criar Pelada {countNext} e ir para o sorteio</button>
             <p className="help-center">A lista será salva. Em seguida, confira os jogadores e sorteie os times.</p>
           </div>}
         </>:<>

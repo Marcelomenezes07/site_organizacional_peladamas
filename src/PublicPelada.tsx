@@ -1,3 +1,4 @@
+import {formatPeladaDate} from '../lib/pelada-date';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {CircleDot,RefreshCw,Plus,Pencil,ChevronDown,Users,Trophy,Target,Handshake,Check,Clock3,Info} from 'lucide-react';
 import {summarize,type PublicPelada,type Match,type Goal} from '../lib/matches';
@@ -126,7 +127,7 @@ export default function PublicPeladaPage({number}:{number:number}){
   }
   return <div className="app public-pelada">{confirmation}
     <header className="header"><div className="header-inner"><div className="brand"><div className="brand-icon" aria-hidden="true">⚽</div><div><h1>PELA<span>DAMAS</span></h1><p>Página da pelada</p></div></div><button className="connection" onClick={()=>void refresh()}><RefreshCw size={16} aria-hidden="true"/> Atualizar</button></div></header>
-    <main className="main"><div className="public-heading"><div><h2>Pelada {number}<span className="heading-dot">.</span></h2><p>Partidas, times e estatísticas.</p></div><div className="sync-label" role="status"><span className="sync-dot"/>{lastSync?`Atualizado às ${lastSync.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`:'Conectando…'}</div></div>
+    <main className="main"><div className="public-heading"><div><h2>{data?.date?`Pelada · ${formatPeladaDate(data.date)}`:`Pelada ${number}`}<span className="heading-dot">.</span></h2><p>Partidas, times e estatísticas.</p></div><div className="sync-label" role="status"><span className="sync-dot"/>{lastSync?`Atualizado às ${lastSync.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`:'Conectando…'}</div></div>
       <nav className="tabs public-tabs" aria-label="Página da pelada"><button aria-pressed={tab==='update'} className={'tab '+(tab==='update'?'selected':'')} onClick={()=>setTab('update')}><CircleDot size={17} aria-hidden="true"/> Partidas</button><button aria-pressed={tab==='summary'} className={'tab '+(tab==='summary'?'selected':'')} onClick={()=>setTab('summary')}><Trophy size={17} aria-hidden="true"/> Resumo</button><button aria-pressed={tab==='teams'} className={'tab '+(tab==='teams'?'selected':'')} onClick={()=>setTab('teams')}><Users size={17} aria-hidden="true"/> Times</button></nav>
       {error&&<div className="panel error-text" role="alert">{error}<button className="button subtle" onClick={()=>void refresh()}>Tentar novamente</button></div>}
       {loading?<p role="status">Carregando pelada…</p>:data&&<>

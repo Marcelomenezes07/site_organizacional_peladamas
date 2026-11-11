@@ -79,3 +79,13 @@ describe('Página pública e persistência',()=>{
     const p=await read(),s=summarize(p,p.players);expect(s.table[0].points).toBe(3);expect(s.table[1].losses).toBe(1);expect(p.players.every(x=>x.goals===0)).toBe(true);
   });
 });
+it('preserva a data escolhida ao publicar times, registrar gols e editar o histórico',async()=>{
+  const csv=peladaToCsv({players,createdAt:'2026-11-11T23:00:00Z',date:'2026-12-05'});
+  memory.docs.set('peladas/pelada_1.csv',{content:csv,etag:'date-test'});
+  expect((await read()).date).toBe('2026-12-05');
+  await publish();await save(match());
+  const doc=memory.docs.get('peladas/pelada_1.csv')!;
+  expect((await handleApi('POST',{action:'savePelada',number:1,etag:doc.etag,players})).status).toBe(200);
+  expect((await read()).date).toBe('2026-12-05');
+  expect(readCsv(memory.docs.get('peladas/pelada_1.csv')!.content).createdAt).toBe('2026-11-11T23:00:00Z');
+});

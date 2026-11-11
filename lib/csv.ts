@@ -7,8 +7,8 @@ const star = (n: number) => String(n).replace('.', ',');
 export function rankingToCsv(players: Player[]): string {
   return '\ufeff' + [enc(['id','nome','apelidos','estrelas']), ...players.map(p=>enc([p.id,p.name,p.aliases,star(p.stars)]))].join('\r\n') + '\r\n';
 }
-export function peladaToCsv(pelada: Pick<Pelada,'players'|'createdAt'>&{matchFile?:string}): string {
-  return '\ufeff' + [enc(['id','nome','apelidos','estrelas','criada_em','gols','assistencias','estado_partidas']), ...pelada.players.map(p=>enc([p.id,p.name,p.aliases,star(p.stars),pelada.createdAt,p.goals??0,p.assists??0,pelada.matchFile??'']))].join('\r\n') + '\r\n';
+export function peladaToCsv(pelada: Pick<Pelada,'players'|'createdAt'|'date'>&{matchFile?:string}): string {
+  return '\ufeff' + [enc(['id','nome','apelidos','estrelas','criada_em','gols','assistencias','estado_partidas','data_pelada']), ...pelada.players.map(p=>enc([p.id,p.name,p.aliases,star(p.stars),pelada.createdAt,p.goals??0,p.assists??0,pelada.matchFile??'',pelada.date??'']))].join('\r\n') + '\r\n';
 }
 
 function rows(csv: string): string[][] {
@@ -30,7 +30,7 @@ function rows(csv: string): string[][] {
   if (field || record.length) {record.push(field);result.push(record);}
   return result;
 }
-export function readCsv(csv: string): {players:Player[]; createdAt:string;matchFile?:string} {
+export function readCsv(csv: string): {players:Player[]; createdAt:string;date?:string;matchFile?:string} {
   const records=rows(csv);
   if (!records.length) return {players:[],createdAt:''};
   const headers=records[0].map(h=>h.trim().toLowerCase());
@@ -43,5 +43,5 @@ export function readCsv(csv: string): {players:Player[]; createdAt:string;matchF
     ...(idx('gols')>=0?{goals:Number(r[idx('gols')]||0),assists:Number(r[idx('assistencias')]||0)}:{})
   }));
   const createdAt=idx('criada_em')>=0?records[1]?.[idx('criada_em')]??'':'';
-  return {players,createdAt,matchFile:idx('estado_partidas')>=0?records[1]?.[idx('estado_partidas')]||undefined:undefined};
+  return {players,createdAt,date:idx('data_pelada')>=0?records[1]?.[idx('data_pelada')]||undefined:undefined,matchFile:idx('estado_partidas')>=0?records[1]?.[idx('estado_partidas')]||undefined:undefined};
 }
