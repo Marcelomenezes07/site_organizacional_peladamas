@@ -31,3 +31,18 @@ it('keeps ordering stable while editing stars and reorders after saving',async()
  expect(document.querySelector('.ranking-row')?.textContent).toContain('Beta');
  expect(document.querySelector('.ranking-save')).toBeNull();
 });
+it('does not let a refresh started before saving overwrite the saved ranking',async()=>{
+ let releaseStale!:()=>void;
+ const stale=structuredClone(state);
+ const base=vi.mocked(fetch).getMockImplementation()!;
+ vi.mocked(fetch).mockImplementationOnce(async()=>{await new Promise<void>(r=>{releaseStale=r;});return Response.json({state:stale});});
+ await click('Atualizar');
+ const select=document.querySelector<HTMLSelectElement>('[aria-label="Estrelas de Alfa"]')!;
+ await act(async()=>{select.value='1';select.dispatchEvent(new Event('change',{bubbles:true}));});
+ vi.mocked(fetch).mockImplementation(base);
+ await click('Salvar alterações');
+ await act(async()=>{releaseStale();await new Promise(r=>setTimeout(r,0));});
+ expect(state.ranking.players.find(p=>p.id==='a')?.stars).toBe(1);
+ expect(document.querySelector<HTMLSelectElement>('[aria-label="Estrelas de Alfa"]')?.value).toBe('1');
+ expect(document.querySelector('.ranking-row')?.textContent).toContain('Beta');
+});

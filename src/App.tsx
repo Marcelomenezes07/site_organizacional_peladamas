@@ -87,18 +87,27 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const refreshingRef=useRef(false);
   const failuresRef=useRef(0);
   const retryAtRef=useRef(0);
-  const refresh=useCallback(async(initial=false)=>{
-    if(savingRef.current||refreshingRef.current)return;
-    refreshingRef.current=true;
+  // Bumped whenever a save starts: a GET issued before it may carry pre-save data and must not be applied.
+  const saveGenerationRef=useRef(0);
+  const refreshAgainRef=useRef(false);
+  const refresh=useCallback(async(initial=false):Promise<void>=>{
+    if(savingRef.current)return;
+    if(refreshingRef.current){refreshAgainRef.current=true;return;}
+    refreshingRef.current=true;refreshAgainRef.current=false;
+    const generation=saveGenerationRef.current;
     try{
       const response=await remote<{state:AppState}>('GET');
       failuresRef.current=0;retryAtRef.current=0;
+      if(generation!==saveGenerationRef.current||savingRef.current){refreshAgainRef.current=true;return;}
       const fresh=response.state;
       stateRef.current=fresh;setState(fresh);setOnline(true);setLastSync(new Date());
       if(!dirtyRef.current){setDraft(clonePlayers(currentList(fresh,currentViewRef.current)?.players||fresh.ranking.players));}
       if(initial)setFeedback('');
     }catch(e){retryAtRef.current=Date.now()+Math.min(120000,12000*2**Math.min(++failuresRef.current,4));setOnline(false);if(initial||!stateRef.current)setFeedback((e as Error).message);}
-    finally{refreshingRef.current=false;if(initial)setLoading(false);}
+    finally{
+      refreshingRef.current=false;if(initial)setLoading(false);
+      if(refreshAgainRef.current&&!savingRef.current){refreshAgainRef.current=false;await refresh();}
+    }
   },[]);
 
   useEffect(()=>{void refresh(true);const timer=setInterval(()=>{if(document.visibilityState==='visible'&&Date.now()>=retryAtRef.current)void refresh();},12000);return()=>clearInterval(timer);},[refresh]);
@@ -128,7 +137,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     if(!state||!dirty||savingRef.current)return;
     const names=draft.map(p=>normalize(p.name));
     if(draft.some(p=>!p.name.trim()||!validStars(p.stars))||new Set(names).size!==names.length){showMessage('Confira nomes repetidos, vazios e estrelas inválidas.');return;}
-    savingRef.current=true;setSaving(true);setFeedback('');
+    savingRef.current=true;saveGenerationRef.current++;setSaving(true);setFeedback('');
     try{
       const target=currentList(state,view);if(!target)throw new Error('Ranking não encontrado.');
       await remote('POST',view==='geral'?{action:'saveRanking',players:draft,etag:target.etag}:
@@ -156,7 +165,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     if(preview.length<4||savingRef.current)return;
     const newcomers=preview.filter(p=>p.unmatched&&!matchPlayer(p.name,state?.ranking.players||[]));
     const addNewcomers=newcomers.length>0&&await confirm(`Adicionar estes ${newcomers.length} novos jogadores também ao Ranking Geral?\n\n${newcomers.map(p=>`${p.name}: ${formatStars(p.stars)} estrelas${p.reviewed?'':' (nota provisória)'}`).join('\n')}\n\nCancelar cria a pelada sem adicioná-los ao Geral.`);
-    savingRef.current=true;setSaving(true);setFeedback('');
+    savingRef.current=true;saveGenerationRef.current++;setSaving(true);setFeedback('');
     try{
       const p=preview.map(({id,name,aliases,stars})=>({id,name,aliases,stars}));
       const answer=await remote<{ok:boolean;number:number;addedToRanking?:number;warning?:string}>('POST',{action:'createPelada',players:p,addToRankingIds:addNewcomers?newcomers.map(p=>p.id):[]});
@@ -170,7 +179,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     if(savingRef.current){showMessage('Aguarde a operação atual terminar antes de excluir.');return;}
     if(!pelada&&!state?.pendingDeletions?.includes(number)){showMessage('Esta pelada não está mais na lista. Atualize os dados para continuar.');return;}
     if(!await confirm(`Excluir a Pelada ${number}? O histórico desta pelada será removido. O Ranking Geral será mantido. Esta ação não pode ser desfeita.`))return;
-    savingRef.current=true;setSaving(true);setFeedback('');
+    savingRef.current=true;saveGenerationRef.current++;setSaving(true);setFeedback('');
     try{
       await remote('POST',{action:'deletePelada',number,etag:pelada?.etag});
       if(currentViewRef.current===String(number)){
@@ -185,7 +194,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const selectPelada=(value:number)=>{setSourceNumber(value);setTeams(null);setCopied(false);};
   const drawTeams=async()=>{
     if(!activePelada||savingRef.current)return;
-    savingRef.current=true;setSaving(true);setFeedback('');
+    savingRef.current=true;saveGenerationRef.current++;setSaving(true);setFeedback('');
     try{
       const published=await getPelada(activePelada.number);
       if(published.matches.length)throw new Error('Os times não podem mudar porque já existem partidas registradas.');

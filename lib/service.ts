@@ -47,7 +47,7 @@ async function getState():Promise<AppState>{
   const pending:number[]=[];
   const p=await peladas(paths.filter(path=>/^peladas\/pelada_\d+\.csv$/.test(path)),pending);
   const ids=[...paths,...excluded].map(path=>Number(path.match(/pelada_(\d+)\.(?:csv|json)$/)?.[1]||0));
-  return {ranking:r,peladas:p,nextPeladaNumber:Math.max(0,...ids)+1,pendingDeletions:pending};
+  return {ranking:r,peladas:p,nextPeladaNumber:Math.max(0,...ids)+1,pendingDeletions:pending.sort((a,b)=>a-b)};
 }
 async function addToRanking(players:Player[]):Promise<number>{
   if(!players.length)return 0;
