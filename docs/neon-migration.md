@@ -25,3 +25,9 @@ O painel reutiliza os arquivos carregados, reduzindo quatro listagens para duas 
 - Tentativa de configurar suspensão em 300 segundos foi recusada pelo plano. Configuração padrão mantida.
 
 Não considerar esta preparação pronta para produção antes das validações pendentes. Para reverter a seleção de armazenamento, remover STORAGE_PROVIDER=neon; isso volta ao Blob antigo e não copia dados novos para ele. O Blob antigo continua sujeito ao bloqueio já existente.
+
+## Validação de liberação — 11/11/2026
+
+Revisão da branch claude/neon-storage-review-f3tg4k concluída em banco isolado codex-validation-20261111. Integração real do adaptador Neon passou (CRUD e conflitos concorrentes), assim como os fluxos de navegador: login, criação, sorteio, publicação, partidas, gols/assistências, edição, exclusão física e sincronização entre duas sessões. Viewports 390x844 e 1440x900 conferidos. Corrigido fallback de Copiar link quando Clipboard API não existe ou recusa acesso. Total: 55 testes e build aprovados.
+
+Liberação autorizada pelo usuário. Vercel production usa STORAGE_PROVIDER=neon e DATABASE_URL da branch production do projeto Neon existente. Credenciais de login existentes preservadas. Dados fictícios permanecem exclusivamente no banco isolado. A validação acima substitui as pendências de integração e navegador da preparação inicial; testes de carga e aparelhos físicos não fazem parte desta validação.
