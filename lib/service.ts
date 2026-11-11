@@ -1,3 +1,4 @@
+import {getOrCreatePeladaPassword,passwordPath} from './pelada-password.js';
 import {validPeladaDate} from './pelada-date.js';
 import {readMatchState} from './public-pelada.js';
 import { readCsv, rankingToCsv, peladaToCsv } from './csv.js';
@@ -71,6 +72,13 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
     if(method!=='POST')return output(405,{error:'Método não permitido.'});
     if(!payload||typeof payload!=='object')return output(400,{error:'Solicitação inválida.'});
     const data=payload as Record<string,unknown>;
+    if(data.action==='getPeladaPassword'){
+      const number=Number(data.number);
+      if(!Number.isSafeInteger(number)||number<1)return output(400,{error:'Pelada inválida.'});
+      const doc=await readDocument(peladaPath(number));
+      if(!doc||doc.content===deletedMarker)return output(404,{error:'Pelada não encontrada.'});
+      return output(200,{password:await getOrCreatePeladaPassword(number)});
+    }
     if(data.action==='saveRanking'){
       const players=checkPlayers(data.players);
       const doc=await readDocument(rankPath);
@@ -95,6 +103,7 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
       try{
         const snapshots=(await listDocuments('partidas/')).filter(p=>p.startsWith(`partidas/pelada_${number}_`)&&p.endsWith('.json'));
         for(const snapshot of snapshots)await deleteDocument(snapshot);
+        await deleteDocument(passwordPath(number));
         const marker=await readDocument(path);
         if(marker){if(marker.content!==deletedMarker)throw new ConflictError();await deleteDocument(path,marker.etag);}
       }catch(e){console.error('Limpeza pendente da pelada',number,e);return output(500,{error:'A pelada foi desativada, mas a limpeza dos arquivos falhou. Use Concluir exclusão para tentar novamente.'});}

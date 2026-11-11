@@ -368,3 +368,10 @@ footer{padding:24px 0}.footer-mark{font-size:14px;opacity:1}.public-footer{paddi
 .team-marker[data-team='1'],.featured .team-marker[data-team='1']{background:#fbe8db;color:#8d451a}
 .team-marker[data-team='2'],.featured .team-marker[data-team='2']{background:#ccebd5;color:#205d35}
 .team-marker[data-team='3'],.featured .team-marker[data-team='3']{background:#fff2c9;color:#735319}
+
+.pelada-password {display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-top:10px;font-size:12px;color:var(--muted,#59685f)}
+.pelada-password code {font:inherit;font-family:monospace;user-select:all;color:var(--ink,#24352e)}
+.password-copy {display:inline-flex;align-items:center;justify-content:center;background:transparent;border:0;color:inherit;cursor:pointer;padding:6px;font:inherit;border-radius:5px}
+.password-copy:focus-visible {outline:2px solid #08764f;outline-offset:2px}
+.match-delete-area {margin-top:20px;padding-top:16px;border-top:1px solid #dce3dc}
+.match-delete-area input {margin-top:6px}

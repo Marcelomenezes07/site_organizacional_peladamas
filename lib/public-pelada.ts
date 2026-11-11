@@ -1,3 +1,4 @@
+import {validPeladaPassword} from './pelada-password.js';
 import {randomUUID} from 'node:crypto';
 import {readDocument,createDocument,updateDocument,deleteDocument,ConflictError} from './storage.js';
 import {readCsv,peladaToCsv} from './csv.js';
@@ -23,7 +24,7 @@ export async function handlePublicPelada(method:string,number:number,payload:unk
     if(method!=='POST')return reply(405,{error:'Método não permitido.'});
     if(!payload||typeof payload!=='object')return reply(400,{error:'Solicitação inválida.'});
     const data=payload as Record<string,unknown>;
-    if(!['publishTeams','saveMatch'].includes(String(data.action)))return reply(400,{error:'Ação não permitida nesta página.'});
+    if(!['publishTeams','saveMatch','deleteMatch'].includes(String(data.action)))return reply(400,{error:'Ação não permitida nesta página.'});
     if(data.action==='publishTeams'&&!admin)return reply(401,{error:'Somente o administrador pode salvar os times.'});
     if(data.etag!==doc.etag)throw new ConflictError();
     let next:MatchState;
@@ -34,6 +35,10 @@ export async function handlePublicPelada(method:string,number:number,payload:unk
       if(data.teams.some(t=>!Array.isArray(t)||!t.length)||ids.length!==parsed.players.length||new Set(ids).size!==ids.length||ids.some(id=>!parsed.players.some(p=>p.id===id)))return reply(400,{error:'Distribua todos os convocados uma única vez.'});
       const teams:SavedTeam[]=data.teams.map((playerIds,i)=>({id:`time-${i+1}`,name:`Time ${i+1}`,playerIds}));
       next={teams,matches:[]};
+    }else if(data.action==='deleteMatch'){
+      if(!await validPeladaPassword(number,data.password))return reply(403,{error:'Senha da pelada incorreta. Peça a senha ao organizador.'});
+      if(typeof data.matchId!=='string'||!state.matches.some(m=>m.id===data.matchId))return reply(404,{error:'Partida não encontrada.'});
+      next={teams:state.teams,matches:state.matches.filter(m=>m.id!==data.matchId)};
     }else{
       if(!state.teams.length)return reply(409,{error:'Aguarde o administrador salvar os times.'});
       const match=validateMatch(data.match,state.teams);

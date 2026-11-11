@@ -19,6 +19,7 @@ export default function PublicPeladaPage({number}:{number:number}){
   const [tab,setTab]=useState<'update'|'summary'|'teams'>('update'),[ranking,setRanking]=useState<'goals'|'assists'>('goals');
   const [draft,setDraft]=useState<Match|null>(null),[version,setVersion]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
   const [noticeError,setNoticeError]=useState(false);
+  const [deleting,setDeleting]=useState(false),[deletePassword,setDeletePassword]=useState(''),[deleteError,setDeleteError]=useState('');
   const [showAllRanking,setShowAllRanking]=useState(false);
   const [lastSync,setLastSync]=useState<Date|null>(null);
   const [quickGoal,setQuickGoal]=useState<{match:Match;teamId:string;etag:string;scorer:string;assist:string;error:string}|null>(null);
@@ -34,6 +35,7 @@ export default function PublicPeladaPage({number}:{number:number}){
     if(data.teams.length<2){setNoticeError(true);setNotice('É preciso publicar pelo menos dois times para criar uma partida.');return;}
     if(draft&&!await confirm('Descartar a edição atual para abrir outra partida?'))return;
     const next:Match=match?{...structuredClone(match),status:'finished'}:{id:newMatchId(),homeId:data.teams[0].id,awayId:data.teams[1].id,status:'finished',homeScore:0,awayScore:0,goals:[]};
+    setDeleting(false);setDeletePassword('');setDeleteError('');
     setQuickGoal(null);setDraft(next);
     setVersion(data.etag);setNotice('');setNoticeError(false);setTab('update');
   }
@@ -82,6 +84,16 @@ export default function PublicPeladaPage({number}:{number:number}){
     setBusy(true);setNotice('');setNoticeError(false);
     try{await changePelada(number,{action:'saveMatch',match:draft,etag:version});setDraft(null);setNotice(isNewMatch?'Partida criada! Use Adicionar gol para atualizar durante o jogo.':'Partida salva. Estatísticas atualizadas!');await refresh();}
     catch(e){setNoticeError(true);setNotice((e as Error).message);await refresh();}
+    finally{setBusy(false);}
+  }
+  async function deleteMatch(){
+    if(!draft||busy||!deletePassword.trim())return;
+    if(!await confirm('Excluir esta partida? O resultado, os gols e as assistências dela serão removidos das estatísticas. Esta ação não pode ser desfeita.'))return;
+    setBusy(true);setDeleteError('');
+    try{
+      await changePelada(number,{action:'deleteMatch',matchId:draft.id,password:deletePassword,etag:version});
+      setDraft(null);setDeleting(false);setDeletePassword('');setNoticeError(false);setNotice('Partida excluída. Estatísticas atualizadas!');await refresh();
+    }catch(e){setDeleteError((e as Error).message);await refresh();}
     finally{setBusy(false);}
   }
   const isNewMatch=!!draft&&!data?.matches.some(m=>m.id===draft.id);
@@ -147,6 +159,7 @@ export default function PublicPeladaPage({number}:{number:number}){
               <p className="hint">O placar deve ter um autor para cada gol. Gol contra conta para o time, sem crédito no ranking individual.</p>
             </>}
             <div className="button-row"><button className="button subtle" onClick={()=>void confirm('Descartar esta edição?').then(ok=>{if(ok)setDraft(null);})}>{isNewMatch?'Cancelar':'Cancelar edição'}</button><button className="button primary" disabled={version!==data.etag||draft.goals.some(g=>!g.ownGoal&&!g.scorerId)} onClick={()=>void save()}>{busy?'Salvando…':isNewMatch?'Criar partida':'Salvar partida'}</button></div></fieldset>
+            {!isNewMatch&&<div className="match-delete-area">{!deleting?<button type="button" className="button danger" disabled={busy} onClick={()=>{setDeleting(true);setDeletePassword('');setDeleteError('');}}>Excluir partida</button>:<form onSubmit={e=>{e.preventDefault();void deleteMatch();}}><label htmlFor="delete-match-password">Senha da pelada</label><input id="delete-match-password" type="password" autoComplete="off" maxLength={100} required value={deletePassword} disabled={busy} onChange={e=>setDeletePassword(e.target.value)}/><p className="hint">Peça a senha ao organizador para excluir esta partida.</p>{deleteError&&<p role="alert" className="error-text">{deleteError}</p>}<div className="button-row"><button type="button" className="button subtle" disabled={busy} onClick={()=>{setDeleting(false);setDeletePassword('');setDeleteError('');}}>Cancelar exclusão</button><button type="submit" className="button danger" disabled={busy||!deletePassword.trim()||version!==data.etag}>{busy?'Excluindo…':'Excluir partida'}</button></div></form>}</div>}
           </section>}
           {notice&&<div className={'match-notice'+(noticeError?' error':'')} role={noticeError?'alert':'status'}>{noticeError?<Info size={18} aria-hidden="true"/>:<Check size={18} aria-hidden="true"/>}{notice}</div>}
           <section aria-label="Partidas desta pelada" className="match-list">

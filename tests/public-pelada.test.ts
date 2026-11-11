@@ -89,3 +89,44 @@ it('preserva a data escolhida ao publicar times, registrar gols e editar o hist�
   expect((await read()).date).toBe('2026-12-05');
   expect(readCsv(memory.docs.get('peladas/pelada_1.csv')!.content).createdAt).toBe('2026-11-11T23:00:00Z');
 });
+describe('Exclusão de partidas com senha da pelada',()=>{
+  const password=async()=>String((await handleApi('POST',{action:'getPeladaPassword',number:1})).value.password);
+  const remove=async(pass:unknown,id='m1',etag?:string)=>handlePublicPelada('POST',1,{action:'deleteMatch',matchId:id,password:pass,etag:etag??(await read()).etag});
+  it('gera uma senha estável para peladas existentes e não a revela publicamente',async()=>{
+    const pass=await password();expect(pass).toMatch(/^[A-Za-z0-9_-]{12}$/);expect(await password()).toBe(pass);
+    expect(JSON.stringify(await read())).not.toContain(pass);
+    expect(memory.docs.get('peladas/pelada_1.csv')!.content).not.toContain(pass);
+    expect((await handleRequest('/api/data','POST',{action:'getPeladaPassword',number:1},headers)).status).toBe(401);
+    expect((await handlePublicPelada('POST',1,{action:'getPeladaPassword'})).status).toBe(400);
+  });
+  it('rejeita senha ausente, errada ou de outra pelada sem alterar o jogo',async()=>{
+    await publish();await save(match());await password();
+    memory.docs.set('peladas/pelada_2.csv',{content:peladaToCsv({players,createdAt:'2026'}),etag:'other'});
+    const other=(await handleApi('POST',{action:'getPeladaPassword',number:2})).value.password;
+    for(const pass of [undefined,'errada',other])expect((await remove(pass)).status).toBe(403);
+    expect((await read()).matches).toHaveLength(1);
+  });
+  it('remove somente a partida escolhida e recalcula gols, assistências, pontos e CSV',async()=>{
+    await publish();await save(match());await save(match('m2'));
+    const pass=await password();expect((await remove(pass)).status).toBe(200);
+    let p=await read();expect(p.matches.map(m=>m.id)).toEqual(['m2']);
+    expect(p.players[0].goals).toBe(1);expect(p.players[1].assists).toBe(1);
+    expect(summarize(p,p.players).table.find(t=>t.id==='time-1')?.points).toBe(3);
+    expect(readCsv(memory.docs.get('peladas/pelada_1.csv')!.content).players[0].goals).toBe(1);
+    expect((await remove(pass,'m2')).status).toBe(200);p=await read();
+    expect(p.matches).toHaveLength(0);expect(p.teams).toHaveLength(2);
+    expect(p.players.every(x=>x.goals===0&&x.assists===0)).toBe(true);
+  });
+  it('recusa exclusão com versão antiga e mantém a partida se a gravação falhar',async()=>{
+    await publish();await save(match());const pass=await password(),old=(await read()).etag;
+    await save(match('m2'));expect((await remove(pass,'m1',old)).status).toBe(409);
+    memory.failCommit=true;const log=vi.spyOn(console,'error').mockImplementation(()=>{});
+    try{expect((await remove(pass)).status).toBe(500);expect((await read()).matches).toHaveLength(2);}finally{log.mockRestore();}
+  });
+  it('remove o segredo ao excluir a pelada inteira',async()=>{
+    await password();expect(memory.docs.has('segredos/pelada_1.json')).toBe(true);
+    expect((await handleApi('POST',{action:'deletePelada',number:1,etag:(await read()).etag})).status).toBe(200);
+    expect(memory.docs.has('segredos/pelada_1.json')).toBe(false);
+    expect((await handleApi('POST',{action:'getPeladaPassword',number:1})).status).toBe(404);
+  });
+});
