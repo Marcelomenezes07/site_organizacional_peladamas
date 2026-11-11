@@ -28,10 +28,10 @@ async function ranking():Promise<Ranking>{
   if(!doc)return {players:starterPlayers.map(x=>({...x})),etag:null};
   return {players:checkPlayers(readCsv(doc.content).players),etag:doc.etag};
 }
-async function peladas():Promise<Pelada[]>{
-  const paths=(await listDocuments('peladas/')).filter(p=>/^peladas\/pelada_\d+\.csv$/.test(p));
+async function peladas(pathsOverride?:string[], pending:number[]=[]):Promise<Pelada[]>{
+  const paths=pathsOverride??(await listDocuments('peladas/')).filter(p=>/^peladas\/pelada_\d+\.csv$/.test(p));
   const docs=await Promise.all(paths.map(async path=>{
-    const doc=await readDocument(path);if(!doc||doc.content===deletedMarker)return null;
+    const doc=await readDocument(path);if(!doc)return null;if(doc.content===deletedMarker){pending.push(Number(path.match(/pelada_(\d+)/)![1]));return null;}
     const parsed=readCsv(doc.content);
     return {number:Number(path.match(/pelada_(\d+)\.csv$/)?.[1]),createdAt:parsed.createdAt,
       players:checkPlayers(parsed.players,120).map(p=>({...p,goals:parsed.players.find(x=>x.id===p.id)?.goals??0,assists:parsed.players.find(x=>x.id===p.id)?.assists??0})),etag:doc.etag};
@@ -43,10 +43,11 @@ async function usedPeladaNumbers(){
   return groups.flat().map(path=>Number(path.match(/pelada_(\d+)\.(?:csv|json)$/)?.[1]||0));
 }
 async function getState():Promise<AppState>{
-  const [r,p,ids,paths]=await Promise.all([ranking(),peladas(),usedPeladaNumbers(),listDocuments('peladas/')]);
-  const pending=await Promise.all(paths.filter(path=>/^peladas\/pelada_\d+\.csv$/.test(path)).map(async path=>(await readDocument(path))?.content===deletedMarker?Number(path.match(/pelada_(\d+)/)![1]):null));
-  const nextPeladaNumber=Math.max(0,...ids)+1;
-  return {ranking:r,peladas:p,nextPeladaNumber,pendingDeletions:pending.filter((n):n is number=>n!==null)};
+  const [r,paths,excluded]=await Promise.all([ranking(),listDocuments('peladas/'),listDocuments('excluidas/')]);
+  const pending:number[]=[];
+  const p=await peladas(paths.filter(path=>/^peladas\/pelada_\d+\.csv$/.test(path)),pending);
+  const ids=[...paths,...excluded].map(path=>Number(path.match(/pelada_(\d+)\.(?:csv|json)$/)?.[1]||0));
+  return {ranking:r,peladas:p,nextPeladaNumber:Math.max(0,...ids)+1,pendingDeletions:pending};
 }
 async function addToRanking(players:Player[]):Promise<number>{
   if(!players.length)return 0;

@@ -13,6 +13,7 @@
     "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "@vercel/blob": "^2.3.0",
     "iron-session": "^9.0.1",
     "lucide-react": "^0.468.0",

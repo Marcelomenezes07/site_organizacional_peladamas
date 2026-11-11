@@ -84,20 +84,25 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const currentViewRef=useRef('geral');
   const showMessage=(s:string)=>{setFeedback(s);};
 
+  const refreshingRef=useRef(false);
+  const failuresRef=useRef(0);
+  const retryAtRef=useRef(0);
   const refresh=useCallback(async(initial=false)=>{
-    if(savingRef.current)return;
+    if(savingRef.current||refreshingRef.current)return;
+    refreshingRef.current=true;
     try{
       const response=await remote<{state:AppState}>('GET');
+      failuresRef.current=0;retryAtRef.current=0;
       const fresh=response.state;
       stateRef.current=fresh;setState(fresh);setOnline(true);setLastSync(new Date());
       if(!dirtyRef.current){setDraft(clonePlayers(currentList(fresh,currentViewRef.current)?.players||fresh.ranking.players));}
       if(initial)setFeedback('');
-    }catch(e){setOnline(false);if(initial||!stateRef.current)setFeedback((e as Error).message);}
-    finally{if(initial)setLoading(false);}
+    }catch(e){retryAtRef.current=Date.now()+Math.min(120000,12000*2**Math.min(++failuresRef.current,4));setOnline(false);if(initial||!stateRef.current)setFeedback((e as Error).message);}
+    finally{refreshingRef.current=false;if(initial)setLoading(false);}
   },[]);
 
-  useEffect(()=>{void refresh(true);const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},12000);return()=>clearInterval(timer);},[refresh]);
-  useEffect(()=>{const cb=()=>{if(document.visibilityState==='visible')void refresh();};document.addEventListener('visibilitychange',cb);return()=>document.removeEventListener('visibilitychange',cb);},[refresh]);
+  useEffect(()=>{void refresh(true);const timer=setInterval(()=>{if(document.visibilityState==='visible'&&Date.now()>=retryAtRef.current)void refresh();},12000);return()=>clearInterval(timer);},[refresh]);
+  useEffect(()=>{const cb=()=>{if(document.visibilityState==='visible'&&Date.now()>=retryAtRef.current)void refresh();};document.addEventListener('visibilitychange',cb);return()=>document.removeEventListener('visibilitychange',cb);},[refresh]);
   const mark=(players:Player[])=>{setDraft(players);setDirty(true);dirtyRef.current=true;setFeedback('');};
   const setRankingView=async(next:string)=>{
     if(next===view)return;
