@@ -60,3 +60,27 @@ describe('Modos de equilíbrio',()=>{
     expect(new Set(teams.flat().map(p=>p.id)).size).toBe(11);
   });
 });
+
+describe('Cinco estrelas no equilíbrio geral',()=>{
+  it.each([
+    {total:12,fives:3,size:4},
+    {total:12,fives:2,size:4},
+    {total:12,fives:4,size:4},
+    {total:17,fives:9,size:5},
+    {total:17,fives:17,size:5},
+    {total:17,fives:0,size:5},
+    {total:4,fives:3,size:15},
+  ])('distribui $fives cinco estrelas entre $total jogadores',({total,fives,size})=>{
+    const players=Array.from({length:total},(_,i)=>({id:`five-${i}`,name:`Pessoa ${i}`,aliases:'',stars:i<fives?5:[0.5,1,2.5,3,4,4.5][i%6]}));
+    const before=structuredClone(players);
+    for(let run=0;run<8;run++){
+      const teams=sortTeams(players,size,'balanced');
+      const counts=teams.map(t=>t.filter(p=>p.stars===5).length);
+      expect(Math.max(...counts)-Math.min(...counts)).toBeLessThanOrEqual(1);
+      expect(counts.reduce((a,b)=>a+b,0)).toBe(fives);
+      expect(teams.flat().map(p=>p.id).sort()).toEqual(players.map(p=>p.id).sort());
+      expect(Math.max(...teams.map(t=>t.length))-Math.min(...teams.map(t=>t.length))).toBeLessThanOrEqual(1);
+    }
+    expect(players).toEqual(before);
+  });
+});

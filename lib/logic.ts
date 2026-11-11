@@ -57,27 +57,41 @@ export function sortTeams(players:Player[], perTeam:number, mode:DrawMode='balan
   if(players.some(p=>!validStars(p.stars)))throw new Error('Estrelas inválidas.');
   const count=Math.max(2,Math.ceil(players.length/perTeam));
   const capacity=Array.from({length:count},(_,i)=>Math.floor(players.length/count)+(i<players.length%count?1:0));
+  const fiveStarCount=players.filter(p=>p.stars===5).length;
+  const minFives=Math.floor(fiveStarCount/count),maxFives=Math.ceil(fiveStarCount/count);
   let best:Team[]=[];let bestQuality=Infinity;
   for(let round=0;round<24;round++) {
     const teams:Team[]=capacity.map(()=>[]);
+    // Balanced mode makes five-star distribution a constraint, not a scoring preference.
+    const fiveCounts=capacity.map(()=>0);
+    if(mode==='balanced'){
+      for(const player of shuffle(players.filter(p=>p.stars===5))){
+        const available=shuffle(teams.map((_,i)=>i).filter(i=>teams[i].length<capacity[i]));
+        available.sort((a,b)=>fiveCounts[a]-fiveCounts[b]);
+        const target=available[0];teams[target].push(player);fiveCounts[target]++;
+      }
+    }
+    const remaining=mode==='balanced'?players.filter(p=>p.stars!==5):players;
     if(round<12){
       // Randomize ties, then distribute strongest to weakest across available teams.
-      for(const player of shuffle(players).sort((a,b)=>b.stars-a.stars)){
+      for(const player of shuffle(remaining).sort((a,b)=>b.stars-a.stars)){
         const available=shuffle(teams.map((_,i)=>i).filter(i=>teams[i].length<capacity[i]));
         available.sort((a,b)=>teams[a].reduce((s,p)=>s+p.stars,0)/capacity[a]-teams[b].reduce((s,p)=>s+p.stars,0)/capacity[b]);
         teams[available[0]].push(player);
       }
     }else{
-      const slots=shuffle(capacity.flatMap((n,i)=>Array(n).fill(i) as number[]));
-      shuffle(players).forEach((p,i)=>teams[slots[i]].push(p));
+      const slots=shuffle(capacity.flatMap((n,i)=>Array(n-teams[i].length).fill(i) as number[]));
+      shuffle(remaining).forEach((p,i)=>teams[slots[i]].push(p));
     }
     let current=teamQuality(teams,mode);
     for(let it=0;it<600;it++){
       const i=Math.floor(Math.random()*count); let j=Math.floor(Math.random()*(count-1)); if(j>=i)j++;
       const a=Math.floor(Math.random()*teams[i].length), b=Math.floor(Math.random()*teams[j].length);
+      const delta=Number(teams[j][b].stars===5)-Number(teams[i][a].stars===5);
+      if(mode==='balanced'&&(fiveCounts[i]+delta<minFives||fiveCounts[i]+delta>maxFives||fiveCounts[j]-delta<minFives||fiveCounts[j]-delta>maxFives))continue;
       [teams[i][a],teams[j][b]]=[teams[j][b],teams[i][a]];
       const next=teamQuality(teams,mode);
-      if(next<current-1e-8||(Math.abs(next-current)<1e-8&&Math.random()<.35))current=next;
+      if(next<current-1e-8||(Math.abs(next-current)<1e-8&&Math.random()<.35)){current=next;fiveCounts[i]+=delta;fiveCounts[j]-=delta;}
       else [teams[i][a],teams[j][b]]=[teams[j][b],teams[i][a]];
     }
     if(current<bestQuality-1e-8||(Math.abs(current-bestQuality)<1e-8&&Math.random()<.25)){
