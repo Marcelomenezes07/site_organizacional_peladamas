@@ -30,7 +30,7 @@ export function matchPlayer(text: string, ranking: Player[]): Player | null {
 }
 
 export type Team = Player[];
-export type DrawMode = 'balanced' | 'tiers';
+export type DrawMode = 'balanced' | 'tiers' | 'balanced-five-stars';
 export function teamQuality(teams: Team[], mode:DrawMode='balanced'): number {
   if (!teams.length)return Infinity;
   const means=teams.map(t=>t.reduce((n,p)=>n+p.stars,0)/t.length);
@@ -62,16 +62,16 @@ export function sortTeams(players:Player[], perTeam:number, mode:DrawMode='balan
   let best:Team[]=[];let bestQuality=Infinity;
   for(let round=0;round<24;round++) {
     const teams:Team[]=capacity.map(()=>[]);
-    // Balanced mode makes five-star distribution a constraint, not a scoring preference.
+    // The optional five-star mode adds a constraint to the original balance score.
     const fiveCounts=capacity.map(()=>0);
-    if(mode==='balanced'){
+    if(mode==='balanced-five-stars'){
       for(const player of shuffle(players.filter(p=>p.stars===5))){
         const available=shuffle(teams.map((_,i)=>i).filter(i=>teams[i].length<capacity[i]));
         available.sort((a,b)=>fiveCounts[a]-fiveCounts[b]);
         const target=available[0];teams[target].push(player);fiveCounts[target]++;
       }
     }
-    const remaining=mode==='balanced'?players.filter(p=>p.stars!==5):players;
+    const remaining=mode==='balanced-five-stars'?players.filter(p=>p.stars!==5):players;
     if(round<12){
       // Randomize ties, then distribute strongest to weakest across available teams.
       for(const player of shuffle(remaining).sort((a,b)=>b.stars-a.stars)){
@@ -88,7 +88,7 @@ export function sortTeams(players:Player[], perTeam:number, mode:DrawMode='balan
       const i=Math.floor(Math.random()*count); let j=Math.floor(Math.random()*(count-1)); if(j>=i)j++;
       const a=Math.floor(Math.random()*teams[i].length), b=Math.floor(Math.random()*teams[j].length);
       const delta=Number(teams[j][b].stars===5)-Number(teams[i][a].stars===5);
-      if(mode==='balanced'&&(fiveCounts[i]+delta<minFives||fiveCounts[i]+delta>maxFives||fiveCounts[j]-delta<minFives||fiveCounts[j]-delta>maxFives))continue;
+      if(mode==='balanced-five-stars'&&(fiveCounts[i]+delta<minFives||fiveCounts[i]+delta>maxFives||fiveCounts[j]-delta<minFives||fiveCounts[j]-delta>maxFives))continue;
       [teams[i][a],teams[j][b]]=[teams[j][b],teams[i][a]];
       const next=teamQuality(teams,mode);
       if(next<current-1e-8||(Math.abs(next-current)<1e-8&&Math.random()<.35)){current=next;fiveCounts[i]+=delta;fiveCounts[j]-=delta;}
