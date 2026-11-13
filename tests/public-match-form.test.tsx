@@ -59,7 +59,7 @@ it('adds a goal from the match card, saves its scorer, and corrects it through E
  await click('Salvar gol',editor);
  expect(game.matches[0].homeScore).toBe(1);expect(game.matches[0].goals[0].scorerId).toBe('a');
  await click('Editar');editor=document.querySelector('.match-editor')!;
- await click('Remover gol',editor);await click('Salvar partida',editor);
+ await act(async()=>editor.querySelector<HTMLButtonElement>('[aria-label="Remover gol 1"]')!.click());await click('Salvar partida',editor);
  expect(game.matches[0].homeScore).toBe(0);expect(game.matches[0].goals).toEqual([]);
  expect(game.matches).toHaveLength(1);
 });
