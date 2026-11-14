@@ -1,0 +1,154 @@
+/* Peladamas / Clubhouse. Reference principles, original implementation. */
+:root {
+ --canvas:#f2f5f1; --surface:#fff; --ink:#20392e; --muted:#53665b;
+ --line:#dce5dc; --soft:#f7faf6; --mint:#eaf4ec;
+ --ds-shadow-panel:0 2px 3px #193d2603,0 12px 32px -20px #163b2930;
+ --ds-shadow-float:0 4px 8px #163b2905,0 16px 36px -18px #163b2930;
+ --club-radius:20px; --club-ease:cubic-bezier(.22,1,.36,1);
+}
+.app {background:radial-gradient(ellipse at 90% 0%,#e0ede277,transparent 48%),var(--canvas);min-height:100dvh}
+.main {padding-top:20px}
+/* Keep the approved header's colours and football wordmark. */
+.header {box-shadow:0 4px 20px #102f2710}
+.header .connection {background:#ffffff09;border-color:#ffffff30;box-shadow:inset 0 1px #ffffff08}
+.topline {margin-bottom:16px}
+.topline .refresh {font-size:12px;border-radius:8px;transition:background 160ms ease,color 160ms ease}
+.topline .refresh:hover {background:#e4eee4;color:var(--ink)}
+.journey-nav.t-tabs {padding:5px;gap:5px;border:1px solid #dce6dc;border-radius:18px;box-shadow:inset 0 1px #ffffffd9,0 4px 14px #163b2905}
+.journey-nav .t-tab {height:46px;border-radius:12px;font-size:13px;font-weight:650;letter-spacing:-.15px}
+.journey-nav .t-tabs-pill {top:5px;height:46px;border-radius:12px;box-shadow:0 1px 3px #163b2910,0 4px 8px #163b2905}
+.journey-heading h2,.public-heading h2,.section-top h2,.ds-screen-header h2 {font-family:'Outfit','DM Sans',sans-serif;font-weight:650;letter-spacing:-.8px;line-height:1.18}
+.journey-heading h2,.public-heading h2,.section-top h2 {font-size:30px}
+.journey-heading p,.public-heading>div>p {font-size:13px;line-height:1.6;color:var(--muted)}
+.panel {border-color:var(--line);border-radius:var(--club-radius);box-shadow:var(--ds-shadow-panel)}
+.panel h3 {font-family:'Outfit','DM Sans',sans-serif;font-weight:600;letter-spacing:-.4px;font-size:21px}
+.selector-card {position:relative;overflow:hidden;background:linear-gradient(145deg,#ffffff,#fbfdf9)}
+.selector-card::before {content:'';position:absolute;left:0;top:20px;bottom:20px;width:3px;background:#73b487;border-radius:0 3px 3px 0}
+.form-label,.match-editor label {font-weight:600;letter-spacing:0}
+.main-select,.select-wrap.small select,.whatsapp-textarea,.add-form input,.match-editor :is(input,select),.quick-goal select {background:#f8faf7;border:1px solid #cfddcf;border-radius:12px;box-shadow:inset 0 1px 2px #173c2603;transition:border-color 160ms ease,background 160ms ease}
+:is(.main-select,.whatsapp-textarea,.match-editor input,.match-editor select,.quick-goal select):hover:not(:disabled) {border-color:#9dbaa5;background:#fff}
+.button {letter-spacing:-.1px;border-radius:12px;transition:background 160ms ease,border-color 160ms ease,color 160ms ease,transform 160ms var(--club-ease)}
+.button.primary {background:linear-gradient(180deg,#0b8057,#08734d);border-color:#076a47;box-shadow:inset 0 1px #ffffff22,0 3px 6px #08764f12!important}
+.button.primary:hover:not(:disabled) {background:linear-gradient(180deg,#08734d,#075d3f);border-color:#075d3f}
+.button.subtle {background:linear-gradient(180deg,#ffffff,#f7faf6);box-shadow:0 1px 2px #163b2904!important}
+.button.danger {background:#fff6f3;border-color:#e4cbc6;color:#9c3933}
+.button:active:not(:disabled) {transform:translateY(1px)}
+@media(hover:hover) and (pointer:fine){.button:hover:not(:disabled){transform:translateY(-1px)}.button:active:not(:disabled){transform:translateY(1px)}}
+.ds-task-actions {gap:14px}
+.ds-task-actions .button {display:grid;grid-template-columns:36px 1fr;grid-template-rows:auto auto;column-gap:12px;text-align:left;justify-content:start;align-content:center;padding:18px 20px;min-height:90px;border-radius:18px}
+.ds-task-actions .button>svg {grid-row:1/3;align-self:center;box-sizing:content-box;padding:9px;border-radius:12px;background:#ffffff18;border:1px solid #ffffff20}
+.ds-task-actions .button>span {font-family:'Outfit','DM Sans',sans-serif;font-size:17px;font-weight:600;line-height:1.3}
+.ds-task-actions .button>small {font-size:12px;font-weight:400;line-height:1.4;opacity:.9}
+.ds-task-actions .subtle>svg {background:#eaf4ec;color:#2d6541;border-color:#dbe8dc}
+.ds-task-actions .subtle>small {color:var(--muted);opacity:1}
+.ds-screen-header {border-radius:18px;padding:14px 16px;border-color:#d8e4d9;box-shadow:inset 0 1px #fff,var(--ds-shadow-panel)}
+.ds-screen-header h2 {font-size:23px}
+.ds-screen-header p {font-size:11px;font-weight:600;letter-spacing:.15px}
+.ds-screen-header .ds-back {background:#fff9;border-color:#dce6dc;border-radius:12px}
+.ds-task-panel {padding:24px}
+.roster-review>summary,.manage-pelada>summary {font-weight:600}
+.roster-review>summary {font-size:14px}
+.roster-player {border:1px solid #e3ebe2;border-radius:10px;background:#f5f9f3}
+.manage-pelada {padding-inline:8px;color:#6c766e}
+.share-pelada {background:#fff;border:1px solid #b3cfbb;box-shadow:var(--ds-shadow-panel)}
+.share-pelada .share-heading h3 {font-size:21px}
+.share-pelada .button-row .button:first-child {background:#d7e9dc;color:#234f35;border-color:#afcdb8}
+.pelada-password {padding-top:12px;border-top:1px dashed #e1e9df;font-size:11px;line-height:1.6}
+.pelada-password code {background:#f2f7f0;padding:2px 6px;border:1px solid #e1eade;border-radius:5px;letter-spacing:.8px}
+.creation-flow .panel {border-radius:20px;box-shadow:var(--ds-shadow-panel)}
+.creation-flow .stepper__header {border-radius:14px;overflow:hidden}
+.creation-flow .preview-players {border-radius:14px;border:1px solid #e6eadf;overflow:hidden}
+.creation-flow .preview-row {border-bottom-color:#e7ebdf}
+.creation-flow .notice {border-radius:12px;background:#fff9e9;border-color:#ecdbab;color:#725016}
+.creation-flow .creation-actions {margin-top:4px}
+.rank-panel {overflow:hidden}
+.rank-panel .table-header {border-radius:10px;color:#53665b}
+.rank-panel .ranking-row {transition:background 140ms ease;border-color:#e8eee5}
+.rank-panel .ranking-row:hover {background:#f6faf3}
+.rank-position {font-variant-numeric:tabular-nums;font-size:13px;font-weight:650}
+.ranking-row:nth-child(-n+3) .rank-position {width:27px;height:27px;display:grid;place-items:center;border-radius:9px;background:#edf4e9;color:#375b3f}
+.rank-panel .ranking-rating select {background:#eff6eb;border:1px solid #d7e5d0;font-variant-numeric:tabular-nums;color:#385738}
+.rank-panel .ranking-save {border-radius:12px;box-shadow:var(--ds-shadow-float)}
+.search-wrap {border-radius:12px}
+.public-heading {margin-bottom:24px;align-items:center}
+.public-heading h2 {font-size:32px}
+.sync-label {font-size:11px;background:#e9f2e9;border:1px solid #d7e5d7;border-radius:20px;padding:7px 10px}
+.matches-toolbar {margin-bottom:18px}
+.matches-toolbar h3 {font-family:'Outfit','DM Sans',sans-serif;font-weight:600;font-size:22px}
+.match-card {border-radius:22px;border-color:#d9e4d8;box-shadow:var(--ds-shadow-panel)}
+.match-card.featured {border-top:1px solid #c5d9c7}
+.match-top {padding-bottom:16px}
+.match-index {color:#53665b;font-size:12px}
+.latest-label {font-size:10px;letter-spacing:.5px;text-transform:uppercase;border:1px solid #d2e4d3;background:#edf6e9;color:#315939}
+.featured .scoreboard {border-radius:16px;box-shadow:inset 0 1px #ffffff10,0 8px 20px -12px #102f2766}
+.score-number,.featured .score-number {font-family:'Outfit','DM Sans',sans-serif;font-weight:600;letter-spacing:-3px;text-shadow:0 2px 8px #0000000a}
+.team-marker {box-shadow:inset 0 1px #ffffff70;border:1px solid #ffffff40}
+.edit-match {border-radius:10px;font-size:12px;background:#f7faf5}
+.goal-actions .button {border-radius:12px}
+.match-events {border-color:#e0e9df}
+.match-event {border-color:#edf1e8}
+.quick-goal {background:#f5faf2;border:1px solid #dae7d5;border-radius:14px;padding:16px}
+.event-icon {border-radius:10px;background:#eef6e9;color:#3a6a3a}
+.summary-leaders {border-radius:18px;overflow:hidden;box-shadow:var(--ds-shadow-panel)}
+.leader-row {border-color:#e4ece1}
+.table-scroll table {font-variant-numeric:tabular-nums}
+.table-scroll thead th {background:#f0f6ed;font-size:11px;color:#52644e;letter-spacing:.3px}
+.table-scroll tbody tr:first-child {background:#f0f7eb}
+.ranking-result {padding:14px 4px;border-color:#e7eee2}
+.ranking-result strong {font-variant-numeric:tabular-nums;font-size:13px;color:#356036;background:#eef5e9;border-radius:8px;padding:4px 8px}
+/* Team accents are semantic; the four original identities stay distinct. */
+[data-team='0'] {--club-team:#284f91;--club-team-soft:#edf2ff;--club-team-border:#cedbf4}
+[data-team='1'] {--club-team:#8d451a;--club-team-soft:#fff3eb;--club-team-border:#f1d7c5}
+[data-team='2'] {--club-team:#205d35;--club-team-soft:#eaf7ed;--club-team-border:#c3e2cc}
+[data-team='3'] {--club-team:#735319;--club-team-soft:#fff8e2;--club-team-border:#ebdfb0}
+.public-team,.team-card {border:1px solid var(--club-team-border,#d9e5d8);border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 3px 12px #163b2904}
+.public-team {padding:0 16px 10px}
+.public-team h4 {padding:15px 16px;margin:0 -16px 12px;background:var(--club-team-soft,#f0f6ed);color:var(--club-team);border-bottom:1px solid var(--club-team-border);font-family:'Outfit',sans-serif;font-size:18px}
+.public-team p {font-size:11px;color:var(--muted);margin:10px 0}
+.public-team li {font-size:14px;padding:10px 8px;border-radius:7px;border-bottom-color:#e8eee5}
+.public-team li:nth-child(odd) {background:#f6f9f3}
+.team-card .team-head {background:var(--club-team-soft,#edf5e9);color:var(--club-team);border-bottom:1px solid var(--club-team-border)}
+.team-card .team-head strong {font-family:'Outfit',sans-serif;font-size:17px}
+.team-card .team-footer {background:#f7faf4;border-color:#e5eddf}
+.ds-editor-page {background:radial-gradient(ellipse at top right,#dcebdbaa,transparent 60%),#f3f6f1}
+.ds-editor-main .edit-score {background:linear-gradient(145deg,#e9f3e6,#f8fbf5);border-color:#d3e3cc;border-radius:18px;box-shadow:inset 0 1px #fff}
+.ds-editor-main .edit-score strong {font-family:'Outfit',sans-serif;font-size:38px;letter-spacing:-1px}
+.ds-editor-main .goal-entry {border-radius:14px;box-shadow:0 2px 4px #163b2903}
+.ds-editor-main .edit-save-actions {border-radius:18px;box-shadow:var(--ds-shadow-float)}
+.login-shell {background:radial-gradient(ellipse at 15% 10%,#dcecd9,transparent 55%),radial-gradient(ellipse at 100% 100%,#e4eee2,transparent 50%),#f3f6f0}
+.login-card {border-radius:24px;border:1px solid #ffffffd9;background:#fffffff2;box-shadow:0 2px 4px #163b2903,0 28px 70px -35px #153f2850}
+.login-card h1 {font-family:'Outfit','DM Sans',sans-serif;font-weight:600;letter-spacing:-1.4px;color:#203b2b}
+.login-card .footer-mark {font-size:16px}
+.login-card :is(input) {border-radius:12px;min-height:50px;background:#f8fbf5;border-color:#d4e1cf}
+.login-card .login-description {font-size:14px}
+.public-footer,footer {font-size:11px;opacity:.9}
+@supports(backdrop-filter:blur(14px)){
+ .journey-nav.t-tabs {background:#e7efe6ba;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+ .ds-screen-header {background:#ffffffc9;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+ .ds-editor-main .edit-save-actions {background:#ffffffeb;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+ .login-card {background:#ffffffdf;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+}
+@media(max-width:600px){
+ .main {padding-top:14px}
+ .topline {margin-bottom:12px}
+ .journey-nav.t-tabs {margin-bottom:24px}
+ .journey-nav .t-tab {font-size:12px;padding:8px 4px;gap:5px}
+ .journey-heading h2,.section-top h2,.public-heading h2 {font-size:27px}
+ .panel {border-radius:18px}
+ .ds-task-actions {gap:10px}
+ .ds-task-actions .button {min-height:78px;padding:14px 16px}
+ .ds-task-panel {padding:20px 16px}
+ .ds-screen-header {padding:12px}
+ .ds-screen-header h2 {font-size:21px}
+ .public-heading {align-items:flex-start;gap:12px}
+ .sync-label {font-size:10px;padding:6px 8px}
+ .match-card {border-radius:20px}
+ .featured .scoreboard {padding:22px 12px}
+ .match-top {padding-bottom:14px}
+ .login-card {border-radius:22px}
+ .public-team {padding-inline:12px}
+ .public-team h4 {margin-inline:-12px;padding-inline:12px}
+}
+@media(prefers-reduced-motion:reduce){
+ .button,.topline .refresh,.ranking-row,:is(input,select,textarea) {transition:none!important;transform:none!important}
+}

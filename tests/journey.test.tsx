@@ -4,7 +4,7 @@ import {createRoot,type Root} from 'react-dom/client';
 import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import App from '../src/App';
 let root:Root,host:HTMLDivElement;
-const click=async(name:string)=>{const b=Array.from(host.querySelectorAll('button')).find(b=>b.textContent?.trim()===name);expect(b).toBeTruthy();await act(async()=>b!.click());};
+const click=async(name:string)=>{const b=Array.from(host.querySelectorAll('button')).find(b=>(b.getAttribute('aria-label')||b.textContent?.trim())===name);expect(b).toBeTruthy();await act(async()=>b!.click());};
 const input=async(el:HTMLInputElement|HTMLTextAreaElement,value:string)=>{await act(async()=>{Object.getOwnPropertyDescriptor(el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value')!.set!.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));});};
 beforeEach(async()=>{
   Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});

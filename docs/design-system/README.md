@@ -39,3 +39,7 @@ Botões: padrão, hover, foco visível, pressionado, desabilitado e ocupado. Err
 ## Reutilização
 
 Novas telas usam `ScreenHeader` e tokens sem copiar valores arbitrários. Novas tarefas ganham contexto e retorno explícitos. Não adicionar efeitos 3D ou dependências de animação para tarefas que CSS resolve. As exceções históricas de CSS serão migradas gradualmente; não houve reescrita de toda a aplicação.
+
+## Acabamento visual Clubhouse
+
+A camada `src/visual-polish.css` refina o sistema para a identidade esportiva: títulos em Outfit, fundo sálvia, superfícies brancas com profundidade leve e controles com estados consistentes. Tokens `--club-team`, `--club-team-soft` e `--club-team-border` identificam os quatro times sem depender apenas da cor (o nome acompanha). Referências e decisões em [referencias-visuais.md](referencias-visuais.md).
