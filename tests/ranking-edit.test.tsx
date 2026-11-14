@@ -46,3 +46,35 @@ it('does not let a refresh started before saving overwrite the saved ranking',as
  expect(document.querySelector<HTMLSelectElement>('[aria-label="Estrelas de Alfa"]')?.value).toBe('1');
  expect(document.querySelector('.ranking-row')?.textContent).toContain('Beta');
 });
+it('paginates both layouts and keeps edits from other pages when saving',async()=>{
+ state.ranking.players=Array.from({length:14},(_,i)=>({id:`p${i}`,name:`Jogador ${String(i+1).padStart(2,'0')}`,aliases:'',stars:3}));
+ await click('Atualizar');
+ expect(document.querySelectorAll('.ranking-row')).toHaveLength(6);
+ expect(document.querySelector('.ranking-grid')).not.toBeNull();
+ const select=document.querySelector<HTMLSelectElement>('[aria-label="Estrelas de Jogador 01"]')!;
+ await act(async()=>{select.value='4';select.dispatchEvent(new Event('change',{bubbles:true}));});
+ await click('Próxima página de jogadores');
+ expect(document.querySelector('.ranking-row')?.textContent).toContain('Jogador 07');
+ await click('Lista');
+ expect(document.querySelector('.ranking-list')).not.toBeNull();
+ expect(document.querySelector('.ranking-row')?.textContent).toContain('Jogador 07');
+ await click('Próxima página de jogadores');
+ expect(document.querySelectorAll('.ranking-row')).toHaveLength(2);
+ expect(document.querySelector<HTMLButtonElement>('[aria-label="Próxima página de jogadores"]')?.disabled).toBe(true);
+ await click('Salvar alterações');
+ expect(state.ranking.players).toHaveLength(14);
+ expect(state.ranking.players.find(p=>p.id==='p0')?.stars).toBe(4);
+});
+it('searches the whole ranking and resets pagination, including no results',async()=>{
+ state.ranking.players=Array.from({length:14},(_,i)=>({id:`p${i}`,name:`Jogador ${String(i+1).padStart(2,'0')}`,aliases:'',stars:3}));
+ await click('Atualizar');await click('Próxima página de jogadores');
+ const input=document.querySelector<HTMLInputElement>('[aria-label="Buscar jogador"]')!;
+ const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
+ await act(async()=>{setter.call(input,'Jogador 14');input.dispatchEvent(new Event('input',{bubbles:true}));});
+ expect(document.querySelectorAll('.ranking-row')).toHaveLength(1);
+ expect(document.querySelector('.ranking-row')?.textContent).toContain('Jogador 14');
+ expect(document.querySelector<HTMLButtonElement>('[aria-label="Página anterior de jogadores"]')?.disabled).toBe(true);
+ await act(async()=>{setter.call(input,'Inexistente');input.dispatchEvent(new Event('input',{bubbles:true}));});
+ expect(document.querySelectorAll('.ranking-row')).toHaveLength(0);
+ expect(document.querySelector('.ranking-pagination')?.textContent).toContain('0 jogadores');
+});

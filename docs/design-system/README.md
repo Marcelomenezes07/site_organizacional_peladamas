@@ -47,3 +47,19 @@ A camada `src/visual-polish.css` refina o sistema para a identidade esportiva: t
 ## Edição minimalista
 
 A edição existente usa `.ds-editor-minimal`: uma superfície branca contínua, linhas finas no lugar de cartões, placar sem moldura, campos com apenas borda inferior e ações alinhadas ao formulário. No celular, a superfície ocupa a tela sem borda externa. Salvar permanece a única ação preenchida. A criação de partida e as outras telas conservam seus estilos. Validação: 78 testes/build e editor em quatro larguras com axe sem violações.
+
+### Superfície contínua e ranking em grade
+
+A camada `src/app-surfaces.css` usa DM Sans em títulos, dados e controles; Outfit permanece na marca. O fundo combina verde e areia em gradientes estáticos suaves, sem imagens ou animação atrás dos dados. A área principal é contínua: sem moldura externa no ranking nem cartões em volta de cada jogador. Molduras semânticas, como compartilhar e placares, continuam disponíveis.
+
+Glassmorphism fica na navegação principal: branco translúcido, blur de 22px, saturação de 145%, borda iluminada e sombra suave. Evitamos vidro aninhado e vidro nas linhas de dados. Há fundo opaco sem suporte a backdrop-filter e para `prefers-reduced-transparency`. As transições existentes respeitam redução de movimento.
+
+Ranking tem Lista/Grade e seis jogadores por página; a busca inclui todos os jogadores. Mudar página/layout mantém o rascunho inteiro. Salvar envia todos os jogadores, inclusive os não visíveis. Novo jogador abre a última página e limpa a busca para ficar visível. A edição ocupa a largura da grade para facilitar nomes e apelidos no celular.
+
+Skills consultadas:
+- [Taste](https://github.com/Leonxlnx/taste-skill/blob/main/skills/taste-skill/SKILL.md): hierarquia, coerência tipográfica, alinhamento e refinamento. Aplicação adaptada ao aplicativo existente; não se declara aprovação pelo gate de landing pages.
+- [Glassmorphism UI](https://github.com/hoboho/glassmorphism-ui/blob/main/SKILL.md): material derivado da paleta existente, contraste, fallback e performance. A solicitação de poucas divisões e fundo discreto prevalece sobre vidro em todos os elementos e auroras animadas.
+- [Transitions](https://github.com/Jakubantalik/transitions.dev/blob/main/skills/transitions-dev/16-tabs-sliding.md): reutilização do controle de navegação já implementado para Lista/Grade.
+- [React Bits](https://github.com/Philotheephilix/reactbits.dev-skill): Stepper original já integrado permanece no fluxo; nenhum efeito adicional pesado é necessário.
+
+Validação: build, 80 testes, auditoria axe WCAG A/AA e overflow em 320/390/768/1440, dados fictícios no navegador. Não substitui teste em aparelhos físicos.

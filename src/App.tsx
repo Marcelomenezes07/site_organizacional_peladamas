@@ -11,7 +11,7 @@ import {
   ArrowDownToLine, ArrowRight, Check, CheckCircle2, ChevronDown, Clipboard,
   Cloud, CloudOff, Copy, FilePlus2, History, Info, LoaderCircle,
   PencilLine, Plus, RefreshCw, RotateCcw, Search, Settings2, ShieldAlert, Shuffle,
-  Trash2, Trophy, Users, X
+  Trash2, Trophy, Users, X, LayoutGrid, List, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { formatStars, matchPlayer, normalize, parseWhatsAppList, sortTeams, starOptions, validStars, type Team, type DrawMode } from '../lib/logic';
 import { peladaToCsv, rankingToCsv } from '../lib/csv';
@@ -74,6 +74,8 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const [online,setOnline]=useState(true);
   const [feedback,setFeedback]=useState('');
   const [search,setSearch]=useState('');
+  const [rankingLayout,setRankingLayout]=useState<'list'|'grid'>('grid');
+  const [rankingPage,setRankingPage]=useState(0);
   const [newName,setNewName]=useState('');
   const [newAliases,setNewAliases]=useState('');
   const [newStars,setNewStars]=useState(3);
@@ -127,7 +129,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const setRankingView=async(next:string)=>{
     if(next===view)return;
     if(dirtyRef.current&&!await confirm('Descartar alterações que ainda não foram salvas?'))return;
-    currentViewRef.current=next;setView(next);setEditingPlayer(null);
+    currentViewRef.current=next;setView(next);setEditingPlayer(null);setRankingPage(0);
     setDraft(clonePlayers(state?currentList(state,next)?.players||[]:[]));setDirty(false);dirtyRef.current=false;setSearch('');setShowAdd(false);setFeedback('');
   };
   const modifyPlayer=(id:string,changes:Partial<Player>)=>mark(draft.map(p=>p.id===id?{...p,...changes}:p));
@@ -135,6 +137,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     const name=newName.trim();if(!name)return;
     if(draft.some(p=>normalize(p.name)===normalize(name))){showMessage('Já existe um jogador com esse nome.');return;}
     mark([...draft,{id:nextId(),name,aliases:newAliases.trim(),stars:newStars}]);
+    setSearch('');setRankingPage(Math.floor(draft.length/6));
     setNewName('');setNewAliases('');setNewStars(3);setShowAdd(false);
   };
   const deletePlayer=async(id:string)=>{
@@ -227,6 +230,9 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const savedOrder=new Map(ordered(state?currentList(state,view)?.players||[]:[]).map((p,i)=>[p.id,i]));
   const stableRanking=[...draft].sort((a,b)=>(savedOrder.get(a.id)??Number.MAX_SAFE_INTEGER)-(savedOrder.get(b.id)??Number.MAX_SAFE_INTEGER));
   const rankRows=stableRanking.filter(p=>normalize(`${p.name} ${p.aliases}`).includes(normalize(search)));
+  const rankingPages=Math.max(1,Math.ceil(rankRows.length/6));
+  const visibleRankingPage=Math.min(rankingPage,rankingPages-1);
+  const visibleRankRows=rankRows.slice(visibleRankingPage*6,(visibleRankingPage+1)*6);
   const rankAvg=draft.length?draft.reduce((s,p)=>s+p.stars,0)/draft.length:0;
   const unknownCount=preview.filter(p=>p.unmatched).length;
   const reviewPageCount=Math.max(1,Math.ceil(preview.length/4));
@@ -259,9 +265,9 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
       {!!state?.pendingDeletions?.length&&<div className="panel"><h3>Arquivos com exclusão pendente</h3><p>Estas peladas já estão desativadas. Conclua a remoção dos arquivos antigos.</p>{state.pendingDeletions.map(number=><button key={number} className="button danger" disabled={saving} onClick={()=>void deletePelada(number)}>Concluir exclusão da Pelada {number}</button>)}</div>}
       {loading?<div className="loading-screen"><LoaderCircle size={30} className="spinner"/><p>Carregando rankings...</p></div>:
       !state?<div className="panel"><Empty icon={<CloudOff size={28}/>} heading="Não foi possível acessar os dados" detail="Confira se a API está funcionando e se o armazenamento foi configurado."/><button className="button primary full" onClick={()=>void refresh(true)}>Tentar novamente</button>{feedback&&<p className="error-text">{feedback}</p>}</div>:
-      tab==='ranking'?<>
+      tab==='ranking'?<section className="ranking-workspace" aria-label="Ranking de estrelas">
         <div className="section-top"><div><h2>Ranking de estrelas</h2></div></div>
-        <div className="panel selector-card"><label htmlFor="rankingSelector" className="form-label">Visualizar ranking</label>
+        <div className="ranking-source"><label htmlFor="rankingSelector" className="form-label">Visualizar ranking</label>
           <div className="select-wrap"><select id="rankingSelector" className="main-select" value={view} onChange={e=>setRankingView(e.target.value)}>
             <option value="geral">⭐ Geral — ranking principal</option>
             {state.peladas.map((p,i)=><option key={p.number} value={String(p.number)}>{i===0?'⚽ Última pelada':i===1?'⚽ Penúltima pelada':'⚽ Pelada'} — Pelada {p.number}</option>)}
@@ -271,18 +277,18 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
         </div>
         {view!=='geral'&&<PeladaLinks key={view} number={Number(view)} version={state.peladas.find(p=>p.number===Number(view))?.etag}/>}
         <p className="context-line">{draft.length} jogadores <span aria-hidden="true">·</span> Média {formatStars(rankAvg)} estrelas</p>
-        <div className="panel rank-panel">
-          <div className="panel-heading"><div><h3>{view==='geral'?'Jogadores':`Jogadores da Pelada ${view}`}</h3><p>Edite e salve ao terminar.</p></div>
+        <div className="rank-panel">
+          <div className="panel-heading ranking-tools"><JourneyNav label="Visualização dos jogadores" value={rankingLayout} onChange={value=>setRankingLayout(value as 'list'|'grid')} items={[{value:'list',label:'Lista',icon:<List size={17} aria-hidden="true"/>},{value:'grid',label:'Grade',icon:<LayoutGrid size={17} aria-hidden="true"/>}]}/>
             <button className="icon-button" title="Baixar o CSV" aria-label="Baixar CSV" onClick={()=>{
               const p=view==='geral'?rankingToCsv(draft):peladaToCsv({players:draft,date:state.peladas.find(p=>String(p.number)===view)?.date,createdAt:state.peladas.find(p=>String(p.number)===view)?.createdAt||''});
               exportCSV(view==='geral'?'ranking_geral.csv':`pelada_${view}.csv`,p);
             }}><ArrowDownToLine size={19}/></button></div>
           {dirty&&<div className="ranking-save"><div className="save-area"><button className="button subtle" disabled={!dirty||saving} onClick={discard}><RotateCcw size={16}/> Descartar</button><button className="button primary" disabled={!dirty||saving} onClick={()=>void saveRanking()}>{saving?<LoaderCircle className="spinner" size={17}/>:<Check size={17}/>} Salvar alterações</button></div>
             <p className="save-note attention">Alterações ainda não salvas.</p></div>}
-          <div className="search-wrap"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Pesquisar jogador..." aria-label="Buscar jogador" /></div>
-          <div role="table" aria-label="Ranking dos jogadores"><div className="table-header" role="row"><span role="columnheader">#</span><span role="columnheader">JOGADOR</span><span role="columnheader">ESTRELAS</span><span role="columnheader" aria-label="Ações"></span></div>
+          <div className="search-wrap"><Search size={18}/><input value={search} onChange={e=>{setSearch(e.target.value);setRankingPage(0);}} placeholder="Pesquisar jogador..." aria-label="Buscar jogador" /></div>
+          <div className={`ranking-display ranking-${rankingLayout}`} role="table" aria-label="Ranking dos jogadores"><div className="table-header" role="row"><span role="columnheader">#</span><span role="columnheader">JOGADOR</span><span role="columnheader">ESTRELAS</span><span role="columnheader" aria-label="Ações"></span></div>
           <div className="ranking-rows" role="rowgroup">
-            {rankRows.length===0?<div role="row"><div role="cell" aria-colspan={4}><Empty icon={<Search size={26}/>} heading="Nenhum jogador" detail="Experimente outro nome de busca."/></div></div>:rankRows.map(p=>
+            {rankRows.length===0?<div role="row"><div role="cell" aria-colspan={4}><Empty icon={<Search size={26}/>} heading="Nenhum jogador" detail="Experimente outro nome de busca."/></div></div>:visibleRankRows.map(p=>
               <div className={'ranking-row'+(editingPlayer===p.id?' editing-player':'')} key={p.id} role="row">
                 <span className="rank-position" role="cell">{stableRanking.findIndex(x=>x.id===p.id)+1}</span>
                 <div className="player-info" role="cell" id={`player-${p.id}`}>
@@ -294,6 +300,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
                 <div role="cell" className="ranking-actions">{view==='geral'?<button className="icon-button" aria-label={`${editingPlayer===p.id?'Fechar edição de':'Editar'} ${p.name}`} aria-expanded={editingPlayer===p.id} aria-controls={`player-${p.id}`} onClick={()=>setEditingPlayer(editingPlayer===p.id?null:p.id)}>{editingPlayer===p.id?<X size={17}/>:<PencilLine size={17}/>}</button>:<button className="delete-button" onClick={()=>deletePlayer(p.id)} aria-label={`Excluir ${p.name}`} title="Excluir deste ranking"><Trash2 size={17}/></button>}</div>
               </div>)}
           </div></div>
+          <nav className="ranking-pagination" aria-label="Páginas do ranking"><button className="icon-button" aria-label="Página anterior de jogadores" disabled={visibleRankingPage===0} onClick={()=>setRankingPage(visibleRankingPage-1)}><ChevronLeft size={18}/></button><span role="status" aria-live="polite">{rankRows.length?`${visibleRankingPage*6+1}–${Math.min((visibleRankingPage+1)*6,rankRows.length)} de ${rankRows.length}`:'0 jogadores'} <small>· Página {visibleRankingPage+1} de {rankingPages}</small></span><button className="icon-button" aria-label="Próxima página de jogadores" disabled={visibleRankingPage>=rankingPages-1} onClick={()=>setRankingPage(visibleRankingPage+1)}><ChevronRight size={18}/></button></nav>
           {view==='geral'&&<div className="add-area">{showAdd?<form onSubmit={e=>{e.preventDefault();addPlayer();}} className="add-form">
             <div className="add-fields"><input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Nome do jogador" maxLength={55} required/><StarsSelect value={newStars} onChange={setNewStars}/></div>
             <input value={newAliases} onChange={e=>setNewAliases(e.target.value)} placeholder="Apelidos separados por | (opcional)" maxLength={180}/>
@@ -302,7 +309,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
 
           {feedback&&<div role="status" aria-live="polite" className={'feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
         </div>
-      </>:<>
+      </section>:<>
         <div className="organization-heading journey-heading" hidden={mode==='sortear'&&organizerScreen!=='overview'}><div><span className="eyebrow">ORGANIZAÇÃO</span><h2>{mode==='criar'?'Nova pelada':'Suas peladas'}</h2><p>{mode==='criar'?'Da lista aos times, um passo de cada vez.':'Escolha a pelada para organizar os times e compartilhar.'}</p></div></div>
         {mode==='criar'?<div ref={flowRef} className="creation-flow"><Stepper step={creationStep} onStepChange={step=>{if(step===1)moveToStep(1);else if(preview.length>=4&&validPeladaDate(peladaDate))moveToStep(2);}} linear showFooter={false} theme="light" accentColor="#08764f" frame={false} width="100%" transition="slide">
           <Step title="Data e lista"><div className="panel"><div className="panel-heading"><div><h3>Cole a lista do WhatsApp</h3><p>Vamos reconhecer os nomes e apelidos do ranking.</p></div></div>
