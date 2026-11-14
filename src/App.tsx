@@ -138,7 +138,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     const name=newName.trim();if(!name)return;
     if(draft.some(p=>normalize(p.name)===normalize(name))){showMessage('Já existe um jogador com esse nome.');return;}
     mark([...draft,{id:nextId(),name,aliases:newAliases.trim(),stars:newStars}]);
-    setSearch('');setRankingPage(Math.floor(draft.length/6));
+    setSearch('');setRankingPage(Math.floor(draft.length/12));
     setNewName('');setNewAliases('');setNewStars(3);setShowAdd(false);
   };
   const deletePlayer=async(id:string)=>{
@@ -231,9 +231,9 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const savedOrder=new Map(ordered(state?currentList(state,view)?.players||[]:[]).map((p,i)=>[p.id,i]));
   const stableRanking=[...draft].sort((a,b)=>(savedOrder.get(a.id)??Number.MAX_SAFE_INTEGER)-(savedOrder.get(b.id)??Number.MAX_SAFE_INTEGER));
   const rankRows=stableRanking.filter(p=>normalize(`${p.name} ${p.aliases}`).includes(normalize(search)));
-  const rankingPages=Math.max(1,Math.ceil(rankRows.length/6));
+  const rankingPages=Math.max(1,Math.ceil(rankRows.length/12));
   const visibleRankingPage=Math.min(rankingPage,rankingPages-1);
-  const visibleRankRows=rankRows.slice(visibleRankingPage*6,(visibleRankingPage+1)*6);
+  const visibleRankRows=rankRows.slice(visibleRankingPage*12,(visibleRankingPage+1)*12);
   const rankAvg=draft.length?draft.reduce((s,p)=>s+p.stars,0)/draft.length:0;
   const unknownCount=preview.filter(p=>p.unmatched).length;
   const reviewPageCount=Math.max(1,Math.ceil(preview.length/4));
@@ -301,7 +301,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
                 <div role="cell" className="ranking-actions">{view==='geral'?<button className="icon-button" aria-label={`${editingPlayer===p.id?'Fechar edição de':'Editar'} ${p.name}`} aria-expanded={editingPlayer===p.id} aria-controls={`player-${p.id}`} onClick={()=>setEditingPlayer(editingPlayer===p.id?null:p.id)}>{editingPlayer===p.id?<X size={17}/>:<PencilLine size={17}/>}</button>:<button className="delete-button" onClick={()=>deletePlayer(p.id)} aria-label={`Excluir ${p.name}`} title="Excluir deste ranking"><Trash2 size={17}/></button>}</div>
               </div>)}
           </div></div>
-          <nav className="ranking-pagination" aria-label="Páginas do ranking"><button className="icon-button" aria-label="Página anterior de jogadores" disabled={visibleRankingPage===0} onClick={()=>setRankingPage(visibleRankingPage-1)}><ChevronLeft size={18}/></button><span role="status" aria-live="polite">{rankRows.length?`${visibleRankingPage*6+1}–${Math.min((visibleRankingPage+1)*6,rankRows.length)} de ${rankRows.length}`:'0 jogadores'} <small>· Página {visibleRankingPage+1} de {rankingPages}</small></span><button className="icon-button" aria-label="Próxima página de jogadores" disabled={visibleRankingPage>=rankingPages-1} onClick={()=>setRankingPage(visibleRankingPage+1)}><ChevronRight size={18}/></button></nav>
+          <nav className="ranking-pagination" aria-label="Páginas do ranking"><button className="icon-button" aria-label="Página anterior de jogadores" disabled={visibleRankingPage===0} onClick={()=>setRankingPage(visibleRankingPage-1)}><ChevronLeft size={18}/></button><span role="status" aria-live="polite">{rankRows.length?`${visibleRankingPage*12+1}–${Math.min((visibleRankingPage+1)*12,rankRows.length)} de ${rankRows.length}`:'0 jogadores'} <small>· Página {visibleRankingPage+1} de {rankingPages}</small></span><button className="icon-button" aria-label="Próxima página de jogadores" disabled={visibleRankingPage>=rankingPages-1} onClick={()=>setRankingPage(visibleRankingPage+1)}><ChevronRight size={18}/></button></nav>
           {view==='geral'&&<div className="add-area">{showAdd?<form onSubmit={e=>{e.preventDefault();addPlayer();}} className="add-form">
             <div className="add-fields"><input autoFocus value={newName} onChange={e=>setNewName(e.target.value)} placeholder="Nome do jogador" maxLength={55} required/><StarsSelect value={newStars} onChange={setNewStars}/></div>
             <input value={newAliases} onChange={e=>setNewAliases(e.target.value)} placeholder="Apelidos separados por | (opcional)" maxLength={180}/>

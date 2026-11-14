@@ -47,28 +47,28 @@ it('does not let a refresh started before saving overwrite the saved ranking',as
  expect(document.querySelector('.ranking-row')?.textContent).toContain('Beta');
 });
 it('paginates both layouts and keeps edits from other pages when saving',async()=>{
- state.ranking.players=Array.from({length:14},(_,i)=>({id:`p${i}`,name:`Jogador ${String(i+1).padStart(2,'0')}`,aliases:'',stars:3}));
+ state.ranking.players=Array.from({length:26},(_,i)=>({id:`p${i}`,name:`Jogador ${String(i+1).padStart(2,'0')}`,aliases:'',stars:3}));
  await click('Atualizar');
- expect(document.querySelectorAll('.ranking-row')).toHaveLength(6);
+ expect(document.querySelectorAll('.ranking-row')).toHaveLength(12);
  await click('Grade');
  expect(document.querySelector('.ranking-grid')).not.toBeNull();
  await click('Alterar estrelas de Jogador 01');
  const select=document.querySelector<HTMLSelectElement>('[aria-label="Estrelas de Jogador 01"]')!;
  await act(async()=>{select.value='4';select.dispatchEvent(new Event('change',{bubbles:true}));});
  await click('Próxima página de jogadores');
- expect(document.querySelector('.ranking-row')?.textContent).toContain('Jogador 07');
+ expect(document.querySelector('.ranking-row')?.textContent).toContain('Jogador 13');
  await click('Lista');
  expect(document.querySelector('.ranking-list')).not.toBeNull();
- expect(document.querySelector('.ranking-row')?.textContent).toContain('Jogador 07');
+ expect(document.querySelector('.ranking-row')?.textContent).toContain('Jogador 13');
  await click('Próxima página de jogadores');
  expect(document.querySelectorAll('.ranking-row')).toHaveLength(2);
  expect(document.querySelector<HTMLButtonElement>('[aria-label="Próxima página de jogadores"]')?.disabled).toBe(true);
  await click('Salvar alterações');
- expect(state.ranking.players).toHaveLength(14);
+ expect(state.ranking.players).toHaveLength(26);
  expect(state.ranking.players.find(p=>p.id==='p0')?.stars).toBe(4);
 });
 it('searches the whole ranking and resets pagination, including no results',async()=>{
- state.ranking.players=Array.from({length:14},(_,i)=>({id:`p${i}`,name:`Jogador ${String(i+1).padStart(2,'0')}`,aliases:'',stars:3}));
+ state.ranking.players=Array.from({length:26},(_,i)=>({id:`p${i}`,name:`Jogador ${String(i+1).padStart(2,'0')}`,aliases:'',stars:3}));
  await click('Atualizar');await click('Próxima página de jogadores');
  const input=document.querySelector<HTMLInputElement>('[aria-label="Buscar jogador"]')!;
  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;

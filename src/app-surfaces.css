@@ -105,3 +105,103 @@
 .ranking-grid .ranking-row.editing-player .player-info {grid-column:2/4}
 .ranking-grid .ranking-row.editing-player .ranking-rating {grid-column:2;grid-row:2}
 .ranking-grid .ranking-row.editing-player .ranking-actions {grid-column:3;grid-row:2}
+
+/* App density: one scale for headings, controls, lists and task screens. */
+:root {--ds-space-lg:20px;--ds-space-xl:24px;--ds-radius-panel:12px;--ds-control-height:40px}
+.main {max-width:960px;padding-top:12px;padding-inline:24px}
+.topline {margin-bottom:8px}
+.main>.journey-nav {margin-bottom:20px}
+.journey-nav.t-tabs {padding:3px;gap:3px;border-radius:12px;box-shadow:0 3px 14px -10px #194b3940,inset 0 1px #fff}
+.journey-nav .t-tab {height:40px;min-height:40px;font-size:12px;border-radius:9px;gap:6px}
+.journey-nav .t-tab svg {width:16px;height:16px}
+.journey-nav .t-tabs-pill {top:3px;height:40px;border-radius:9px}
+.app :is(.section-top h2,.journey-heading h2,.public-heading h2) {font-size:24px;line-height:1.25;letter-spacing:-.6px}
+.app :is(.panel h3,.matches-toolbar h3,.ds-screen-header h2) {font-size:18px;line-height:1.3}
+.app :is(.journey-heading p,.panel-heading p,.public-heading>div>p) {font-size:12px;line-height:1.5;margin-top:6px}
+.organization-heading,.public-heading {margin-block:0 18px}
+.app .button {min-height:40px;padding:8px 12px;font-size:13px;border-radius:9px}
+.app .button svg {width:16px;height:16px}
+.app :is(.icon-button,.delete-button) {min-height:40px;min-width:40px;width:40px;border-radius:8px}
+.main :is(.main-select,.search-wrap input) {min-height:40px;height:40px;font-size:16px}
+.main .form-label {font-size:12px;margin-bottom:6px}
+.panel {padding:18px;margin-bottom:16px;border-radius:12px}
+.panel-heading {margin-bottom:12px}
+.ds-task-actions {gap:10px;margin-bottom:16px}
+.ds-task-actions .button {min-height:68px;padding:12px 14px;grid-template-columns:28px 1fr;gap:2px 10px;border-radius:12px}
+.ds-task-actions .button>svg {width:16px;height:16px;padding:6px;border-radius:8px}
+.ds-task-actions .button>span {font-size:14px}
+.ds-task-actions .button>small {font-size:11px}
+.roster-player {padding:6px 9px;min-height:38px;font-size:12px;border-radius:7px}
+.roster-player strong {font-size:11px}
+.roster-dot {width:5px;height:5px}
+.roster-grid {gap:6px}
+.ranking-workspace .section-top {margin-bottom:12px}
+.ranking-source {margin-bottom:8px;gap:4px 12px}
+.ranking-source .hint {font-size:11px;line-height:1.4}
+.ranking-workspace .context-line {margin:8px 0;font-size:11px}
+.ranking-tools {margin-bottom:8px}
+.ranking-tools .journey-nav {width:166px}
+.ranking-tools .t-tab {height:36px;min-height:36px;font-size:11px}
+.ranking-tools .t-tabs-pill {height:36px}
+.ranking-workspace .ranking-grid .ranking-rows {grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.ranking-workspace .ranking-grid .ranking-row {min-height:42px;padding:0 7px;gap:5px;border-radius:7px;grid-template-columns:16px minmax(0,1fr) auto;background:#f0f6edb3;border-color:#e0e8dc}
+.ranking-player-name {min-height:40px;padding:4px 0;font-size:12px;line-height:1.3;font-weight:500}
+.ranking-workspace .ranking-row .rank-position {font-size:10px}
+.ranking-static-stars {font-size:11px}
+.ranking-workspace .ranking-grid .ranking-rating .stars-select {min-height:40px;width:62px;padding:4px 2px}
+.ranking-workspace .ranking-list .ranking-row {min-height:52px;padding-block:5px}
+.ranking-workspace .ranking-list .player-info>strong {font-size:13px}
+.ranking-pagination {min-height:40px;margin-top:8px}
+.ranking-pagination>span {font-size:11px}
+.ranking-workspace .add-button {min-height:40px;padding:8px 12px;font-size:12px}
+.match-card {padding:16px;border-radius:14px}
+.match-top {padding-bottom:10px}
+.featured .scoreboard {padding:16px 12px;border-radius:12px}
+.score-number,.featured .score-number {font-size:40px;line-height:1.15;letter-spacing:-2px}
+.matches-toolbar {margin-bottom:12px}
+.goal-actions {gap:8px}
+.public-rosters {gap:12px}
+.public-team {border-radius:10px;padding-inline:12px}
+.public-team h4 {font-size:15px;margin-inline:-12px;padding:10px 12px}
+.public-team li {font-size:13px;padding:7px 6px}
+.public-team .team-marker {width:26px;height:26px}
+.public-team .team-marker svg {width:15px;height:15px}
+.stat-grid {gap:10px;margin-bottom:16px}
+.stat {padding:14px;border-radius:10px}
+.stat .leader-name {font-size:18px}
+.stat .stat-label {font-size:11px}
+.stat .stat-label svg {width:15px;height:15px}
+.ds-screen-header {padding:10px 12px;border-radius:12px;margin-bottom:12px}
+.ds-editor-minimal .ds-screen-header h2 {font-size:19px}
+.ds-editor-minimal .edit-goals-heading h4 {font-size:14px}
+.public-footer,footer {padding-block:16px;font-size:10px}
+@media(min-width:1100px){.ranking-workspace .ranking-grid .ranking-rows{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:600px){
+ .main {padding:8px 16px 16px}
+ .main>.journey-nav {margin-bottom:16px}
+ .app :is(.section-top h2,.journey-heading h2,.public-heading h2) {font-size:21px}
+ .organization-heading,.public-heading {margin-bottom:14px}
+ .ranking-workspace .ranking-grid .ranking-rows {grid-template-columns:repeat(2,minmax(0,1fr))}
+ .ranking-workspace .ranking-grid .ranking-row {grid-template-columns:12px minmax(0,1fr) auto;padding-inline:6px;gap:4px}
+ .ranking-tools .journey-nav {margin-bottom:0}
+ .ds-task-actions .button {min-height:60px}
+ .ds-task-actions {grid-template-columns:1fr 1fr}
+ .ds-task-actions .button {grid-template-columns:1fr;gap:4px;text-align:start}
+ .ds-task-actions .button>svg {display:none}
+ .ds-task-actions .button>span {font-size:13px}
+ .public-heading {gap:8px}
+ .sync-label {font-size:9px;padding:5px 7px}
+}
+/* Fixed-height selects need matching vertical padding to avoid clipping text. */
+.main .main-select {padding:7px 36px 7px 12px;line-height:24px}
+.main>.selector-card {margin-bottom:16px;padding-block:12px}
+.main>.roster-review {padding-block:4px;margin-bottom:12px}
+.main>.roster-review>summary {min-height:40px;font-size:13px}
+.main>.manage-pelada {margin-top:12px;padding-block:8px}
+.main>.manage-pelada>summary {font-size:12px;min-height:40px}
+.public-rosters {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.public-team {min-width:0;padding:0 10px 8px}
+.public-team h4 {margin:0 -10px 8px;padding:9px 10px;font-size:14px;gap:6px}
+.public-team p {margin:6px 0;font-size:10px}
+.public-team li {font-size:12px;padding:7px 4px;overflow-wrap:anywhere}
+@media(max-width:700px){.public-rosters{grid-template-columns:repeat(2,minmax(0,1fr))}.public-team h4{font-size:13px}.public-team .team-marker{width:22px;height:22px}.public-team .team-marker svg{width:13px;height:13px}}

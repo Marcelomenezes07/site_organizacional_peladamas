@@ -54,7 +54,7 @@ A camada `src/app-surfaces.css` usa DM Sans em títulos, dados e controles; Outf
 
 Glassmorphism fica na navegação principal: branco translúcido, blur de 22px, saturação de 145%, borda iluminada e sombra suave. Evitamos vidro aninhado e vidro nas linhas de dados. Há fundo opaco sem suporte a backdrop-filter e para `prefers-reduced-transparency`. As transições existentes respeitam redução de movimento.
 
-Ranking tem Lista/Grade e seis jogadores por página; a busca inclui todos os jogadores. Mudar página/layout mantém o rascunho inteiro. Salvar envia todos os jogadores, inclusive os não visíveis. Novo jogador abre a última página e limpa a busca para ficar visível. A edição ocupa a largura da grade para facilitar nomes e apelidos no celular.
+Ranking tem Lista/Grade e 12 jogadores por página; a busca inclui todos os jogadores. Mudar página/layout mantém o rascunho inteiro. Salvar envia todos os jogadores, inclusive os não visíveis. Novo jogador abre a última página e limpa a busca para ficar visível. A edição ocupa a largura da grade para facilitar nomes e apelidos no celular.
 
 Skills consultadas:
 - [Taste](https://github.com/Leonxlnx/taste-skill/blob/main/skills/taste-skill/SKILL.md): hierarquia, coerência tipográfica, alinhamento e refinamento. Aplicação adaptada ao aplicativo existente; não se declara aprovação pelo gate de landing pages.
@@ -65,3 +65,6 @@ Skills consultadas:
 Validação: build, 80 testes, auditoria axe WCAG A/AA e overflow em 320/390/768/1440, dados fictícios no navegador. Não substitui teste em aparelhos físicos.
 
 Ajuste da grade: os jogadores agora usam linhas compactas em verde suave, como a lista da pelada. Tocar no nome abre somente as estrelas; selecionar a nota fecha o seletor e mantém a alteração no rascunho para salvar. Nome e apelidos continuam disponíveis na visualização Lista. O detalhe vertical decorativo do seletor de pelada foi removido e o botão de corrigir notas segue o fluxo abaixo da lista, com espaçamento próprio.
+
+
+Revisão de proporções: navegação principal de 40px, alternância Lista/Grade de 36px, jogadores em grade com 42px mínimos e até quatro colunas no desktop. Os nomes continuam botões de 40px; os campos usam 16px para evitar zoom automático no iPhone. Ranking mostra 12 jogadores por página; a paginação conserva o rascunho completo. Títulos principais 21–24px, títulos de seção 18px; cartões de tarefas, times e placar receberam espaçamentos menores, preservando a marca e o campo de futebol.
