@@ -112,7 +112,7 @@ it('opens and saves a match when randomUUID is unavailable on local HTTP',async(
  try{
   await click('Criar partida');
   const editor=document.querySelector('.match-editor')!;
-  expect(editor).not.toBeNull();expect(document.activeElement).toBe(editor.querySelector('select'));
+  expect(editor).not.toBeNull();expect(document.activeElement).toBe(document.querySelector('.ds-screen-header h2'));
   await click('Criar partida',editor);
   expect(game.matches).toHaveLength(1);
   expect(game.matches[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
@@ -122,4 +122,13 @@ it('shows small empty-state messages instead of leader names before any goals',a
  await click('Resumo');
  expect(document.querySelectorAll('.summary-empty')).toHaveLength(3);
  expect(document.querySelectorAll('.leader-name')).toHaveLength(0);
+});
+it('uses a dedicated editing screen and returns without changing the match',async()=>{
+ await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);await click('Editar');
+ expect(document.querySelector('.ds-editor-page')).not.toBeNull();
+ expect(document.querySelector('.match-list')).toBeNull();
+ expect(document.querySelector('[aria-label="Página da pelada"]')).toBeNull();
+ await click('Voltar');await click('Confirmar');
+ expect(document.querySelector('.ds-editor-page')).toBeNull();expect(game.matches).toHaveLength(1);
+ expect(document.querySelector('.match-card')).not.toBeNull();
 });

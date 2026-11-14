@@ -1,3 +1,4 @@
+import ScreenHeader from './components/ScreenHeader';
 import JourneyNav from './components/JourneyNav';
 import './components/transitions.css';
 import {formatPeladaDate} from '../lib/pelada-date';
@@ -23,11 +24,12 @@ export default function PublicPeladaPage({number}:{number:number}){
   const [noticeError,setNoticeError]=useState(false);
   const [deleting,setDeleting]=useState(false),[deletePassword,setDeletePassword]=useState(''),[deleteError,setDeleteError]=useState('');
   const [showAllRanking,setShowAllRanking]=useState(false);
+  const [goalPage,setGoalPage]=useState(0);
   const [lastSync,setLastSync]=useState<Date|null>(null);
   const [quickGoal,setQuickGoal]=useState<{match:Match;teamId:string;etag:string;scorer:string;assist:string;error:string}|null>(null);
   const {confirm,confirmation}=useConfirmation();
   const editorRef=useRef<HTMLElement>(null);
-  useEffect(()=>{if(draft){editorRef.current?.scrollIntoView?.({block:'nearest'});editorRef.current?.querySelector<HTMLSelectElement>('select')?.focus({preventScroll:true});}},[draft?.id]);
+  useEffect(()=>{if(draft){editorRef.current?.closest('main')?.scrollIntoView?.({block:'start'});editorRef.current?.closest('main')?.querySelector<HTMLElement>('h2')?.focus({preventScroll:true});}},[draft?.id]);
   const refresh=useCallback(async()=>{try{setData(await getPelada(number));setLastSync(new Date());setError('');}catch(e){if(e instanceof PeladaError&&e.status===404)setData(null);setError((e as Error).message);}finally{setLoading(false);}},[number]);
   useEffect(()=>{void refresh();const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},12000);const visible=()=>{if(document.visibilityState==='visible')void refresh();};document.addEventListener('visibilitychange',visible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[refresh]);
   const summary=data?summarize(data,data.players):null;
@@ -38,7 +40,7 @@ export default function PublicPeladaPage({number}:{number:number}){
     if(draft&&!await confirm('Descartar a edição atual para abrir outra partida?'))return;
     const next:Match=match?{...structuredClone(match),status:'finished'}:{id:newMatchId(),homeId:data.teams[0].id,awayId:data.teams[1].id,status:'finished',homeScore:0,awayScore:0,goals:[]};
     setDeleting(false);setDeletePassword('');setDeleteError('');
-    setQuickGoal(null);setDraft(next);
+    setGoalPage(0);setQuickGoal(null);setDraft(next);
     setVersion(data.etag);setNotice('');setNoticeError(false);setTab('update');
   }
   async function openQuickGoal(match:Match,teamId:string){
@@ -74,6 +76,7 @@ export default function PublicPeladaPage({number}:{number:number}){
     if(!draft)return;
     const side=teamId===draft.homeId?'homeScore':'awayScore';
     if(draft[side]>=30)return;
+    setGoalPage(Math.floor(draft.goals.length/4));
     setDraft({...draft,[side]:draft[side]+1,goals:[...draft.goals,{teamId,scorerId:null,assistId:null,ownGoal:false}]});
   }
   function removeGoal(index:number){
@@ -98,6 +101,8 @@ export default function PublicPeladaPage({number}:{number:number}){
     }catch(e){setDeleteError((e as Error).message);await refresh();}
     finally{setBusy(false);}
   }
+  const goalPageCount=Math.max(1,Math.ceil((draft?.goals.length||0)/4));
+  const visibleGoalPage=Math.min(goalPage,goalPageCount-1);
   const isNewMatch=!!draft&&!data?.matches.some(m=>m.id===draft.id);
   const hasUnsavedChanges=!!quickGoal?.scorer||!!draft&&JSON.stringify(draft)!==JSON.stringify(data?.matches.find(m=>m.id===draft.id));
   useEffect(()=>{
@@ -139,6 +144,26 @@ export default function PublicPeladaPage({number}:{number:number}){
       {m.goals.length>0?<details className="match-events"><summary><span><Target size={15} aria-hidden="true"/> {m.goals.length} {m.goals.length===1?'gol registrado':'gols registrados'}</span><ChevronDown size={16} aria-hidden="true"/></summary><div>{m.goals.map((g,j)=><div key={j} className="match-event"><span className="event-icon"><Target size={16} aria-hidden="true"/></span><div><strong>{g.ownGoal?`Gol contra a favor do ${teamName(g.teamId)}`:data!.players.find(p=>p.id===g.scorerId)?.name}</strong><span>{g.assistId?`Assistência de ${data!.players.find(p=>p.id===g.assistId)?.name}`:'Sem assistência'} · {teamName(g.teamId)}</span></div></div>)}</div></details>:<p className="no-goals">O placar está aberto. Adicione o primeiro gol.</p>}
     </article>;
   }
+  if(draft&&data)return <div className="app public-pelada ds-editor-page">{confirmation}<main className="ds-editor-main"><ScreenHeader title={isNewMatch?'Nova partida':'Editar partida'} context={data.date?`Pelada · ${formatPeladaDate(data.date)}`:`Pelada ${number}`} disabled={busy} onBack={()=>{void confirm('Descartar esta edição?').then(ok=>{if(ok)setDraft(null);});}}/>
+{<section className={'panel match-editor'+(!isNewMatch?' edit-existing':'')} ref={editorRef} aria-labelledby="match-editor-title"><div className="edit-heading">{!isNewMatch&&<span className="edit-heading-icon" aria-hidden="true"><Pencil size={19}/></span>}<div><h3 id="match-editor-title">{isNewMatch?'Nova partida':'Editar partida'}</h3>{!isNewMatch&&<p>Confira os times e ajuste os gols abaixo.</p>}</div></div>
+            {version!==data.etag&&<p role="alert" className="error-text">A pelada mudou em outro dispositivo. Sua edição foi mantida. Cancele e reabra a partida antes de salvar.</p>}
+            <fieldset disabled={busy}><legend className="sr-only">{isNewMatch?'Times da partida':'Times e resultado'}</legend><details className="ds-team-disclosure" open={isNewMatch}><summary>{isNewMatch?'Times da partida':'Alterar times'} <ChevronDown size={16}/></summary><div className="match-grid">
+              <label>Time A<select value={draft.homeId} onChange={e=>void changeTeam('homeId',e.target.value)}>{data.teams.map(t=><option key={t.id} value={t.id} disabled={t.id===draft.awayId}>{t.name}</option>)}</select></label>
+              <label>Time B<select value={draft.awayId} onChange={e=>void changeTeam('awayId',e.target.value)}>{data.teams.map(t=><option key={t.id} value={t.id} disabled={t.id===draft.homeId}>{t.name}</option>)}</select></label>
+            </div></details>
+            {!isNewMatch&&<><div className="live-score edit-score" aria-label="Placar atual"><span className="edit-score-team">{teamName(draft.homeId)}</span><strong>{draft.homeScore} <span className="edit-score-divider">×</span> {draft.awayScore}</strong><span className="edit-score-team">{teamName(draft.awayId)}</span><span className="edit-score-caption">Placar desta edição</span></div><div className="edit-goals-heading"><h4>Gols e assistências</h4><span>{draft.goals.length} {draft.goals.length===1?'gol':'gols'}</span></div><div className="match-grid edit-add-goals">{[draft.homeId,draft.awayId].map(id=><button type="button" className="button primary" key={id} disabled={(id===draft.homeId?draft.homeScore:draft.awayScore)>=30} onClick={()=>addGoal(id)}>+ Gol · {teamName(id)}</button>)}</div>
+              {draft.goals.map((g,i)=>{if(Math.floor(i/4)!==visibleGoalPage)return null;const members=data.players.filter(p=>data.teams.find(t=>t.id===g.teamId)?.playerIds.includes(p.id));return <div className="goal-entry" key={i}><div className="edit-goal-heading"><strong>{teamName(g.teamId)} · Gol {draft.goals.slice(0,i+1).filter(x=>x.teamId===g.teamId).length}</strong><button type="button" className="button subtle" aria-label={`Remover gol ${i+1}`} title="Remover gol" onClick={()=>removeGoal(i)}><Trash2 size={17} aria-hidden="true"/></button></div><div className="match-grid">
+                <label>Autor<select aria-label={`Quem fez o gol ${i+1}`} value={g.ownGoal?'own':g.scorerId||''} onChange={e=>changeGoal(i,{scorerId:e.target.value==='own'?null:e.target.value||null,ownGoal:e.target.value==='own',assistId:null})}><option value="">Selecione o jogador</option>{members.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}<option value="own">Gol contra do adversário</option></select></label>
+                <label>Assistência<select aria-label={`Assistência do gol ${i+1}`} disabled={g.ownGoal||!g.scorerId} value={g.assistId||''} onChange={e=>changeGoal(i,{assistId:e.target.value||null})}><option value="">Sem assistência</option>{members.filter(p=>p.id!==g.scorerId).map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+              </div></div>;})}
+              {draft.goals.length>4&&<div className="review-pagination"><button type="button" className="button subtle" disabled={visibleGoalPage===0} onClick={()=>setGoalPage(Math.max(0,visibleGoalPage-1))}>Gols anteriores</button><span>{visibleGoalPage+1} / {goalPageCount}</span><button type="button" className="button subtle" disabled={visibleGoalPage+1>=goalPageCount} onClick={()=>setGoalPage(visibleGoalPage+1)}>Próximos gols</button></div>}<p className="hint edit-goals-hint">{draft.goals.length?'Selecione o autor de cada gol. A assistência é opcional.':'Nenhum gol nesta partida. Use os botões acima para adicionar.'}</p>
+            </>}
+            <div className={'button-row'+(!isNewMatch?' edit-save-actions':'')}><button className="button subtle" onClick={()=>void confirm('Descartar esta edição?').then(ok=>{if(ok)setDraft(null);})}>{isNewMatch?'Cancelar':'Cancelar edição'}</button><button className="button primary" disabled={version!==data.etag||draft.goals.some(g=>!g.ownGoal&&!g.scorerId)} onClick={()=>void save()}>{busy?'Salvando…':isNewMatch?'Criar partida':'Salvar partida'}</button></div></fieldset>
+            {!isNewMatch&&<div className="match-delete-area">{!deleting?<button type="button" className="button danger" disabled={busy} onClick={()=>{setDeleting(true);setDeletePassword('');setDeleteError('');}}>Excluir partida</button>:<form onSubmit={e=>{e.preventDefault();void deleteMatch();}}><h4>Excluir esta partida</h4><p className="hint">O resultado, os gols e as assistências serão removidos.</p><label htmlFor="delete-match-password">Senha da pelada</label><input id="delete-match-password" type="password" autoComplete="off" maxLength={100} required value={deletePassword} disabled={busy} onChange={e=>setDeletePassword(e.target.value)}/><p className="hint">Peça a senha ao organizador para excluir esta partida.</p>{deleteError&&<p role="alert" className="error-text">{deleteError}</p>}<div className="button-row"><button type="button" className="button subtle" disabled={busy} onClick={()=>{setDeleting(false);setDeletePassword('');setDeleteError('');}}>Cancelar exclusão</button><button type="submit" className="button danger" disabled={busy||!deletePassword.trim()||version!==data.etag}>{busy?'Excluindo…':'Excluir partida'}</button></div></form>}</div>}
+          </section>}
+    {notice&&<p role={noticeError?'alert':'status'} className={noticeError?'error-text':'hint'}>{notice}</p>}
+    {error&&<p role="alert" className="error-text">{error}</p>}
+  </main></div>;
   return <div className="app public-pelada">{confirmation}
     <header className="header"><div className="header-inner"><div className="brand"><div className="brand-icon" aria-hidden="true">⚽</div><div><h1>PELA<span>DAMAS</span></h1><p>Página da pelada</p></div></div><button className="connection" onClick={()=>void refresh()}><RefreshCw size={16} aria-hidden="true"/> Atualizar</button></div></header>
     <main className="main"><div className="public-heading"><div><h2>{data?.date?`Pelada · ${formatPeladaDate(data.date)}`:`Pelada ${number}`}<span className="heading-dot">.</span></h2><p>Partidas, times e estatísticas.</p></div><div className="sync-label" role="status"><span className="sync-dot"/>{lastSync?`Atualizado às ${lastSync.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`:'Conectando…'}</div></div>
@@ -147,22 +172,6 @@ export default function PublicPeladaPage({number}:{number:number}){
       {loading?<p role="status">Carregando pelada…</p>:data&&<>
         {!data.teams.length?<div className="panel"><h3>Aguardando os times</h3><p>O administrador precisa sortear e salvar os times. Esta página atualiza automaticamente.</p></div>:tab==='update'?<>
           <div className="matches-toolbar"><div><h3>Partidas</h3></div>{!draft&&<button className="button primary" disabled={busy} onClick={()=>void edit()}><Plus size={18} aria-hidden="true"/> Criar partida</button>}</div>
-          {draft&&<section className={'panel match-editor'+(!isNewMatch?' edit-existing':'')} ref={editorRef} aria-labelledby="match-editor-title"><div className="edit-heading">{!isNewMatch&&<span className="edit-heading-icon" aria-hidden="true"><Pencil size={19}/></span>}<div><h3 id="match-editor-title">{isNewMatch?'Nova partida':'Editar partida'}</h3>{!isNewMatch&&<p>Confira os times e ajuste os gols abaixo.</p>}</div></div>
-            {version!==data.etag&&<p role="alert" className="error-text">A pelada mudou em outro dispositivo. Sua edição foi mantida. Cancele e reabra a partida antes de salvar.</p>}
-            <fieldset disabled={busy}><legend>{isNewMatch?'Times da partida':'Times e resultado'}</legend><div className="match-grid">
-              <label>Time A<select value={draft.homeId} onChange={e=>void changeTeam('homeId',e.target.value)}>{data.teams.map(t=><option key={t.id} value={t.id} disabled={t.id===draft.awayId}>{t.name}</option>)}</select></label>
-              <label>Time B<select value={draft.awayId} onChange={e=>void changeTeam('awayId',e.target.value)}>{data.teams.map(t=><option key={t.id} value={t.id} disabled={t.id===draft.homeId}>{t.name}</option>)}</select></label>
-            </div>
-            {!isNewMatch&&<><div className="live-score edit-score" aria-label="Placar atual"><span className="edit-score-team">{teamName(draft.homeId)}</span><strong>{draft.homeScore} <span className="edit-score-divider">×</span> {draft.awayScore}</strong><span className="edit-score-team">{teamName(draft.awayId)}</span><span className="edit-score-caption">Placar desta edição</span></div><div className="edit-goals-heading"><h4>Gols e assistências</h4><span>{draft.goals.length} {draft.goals.length===1?'gol':'gols'}</span></div><div className="match-grid edit-add-goals">{[draft.homeId,draft.awayId].map(id=><button type="button" className="button primary" key={id} disabled={(id===draft.homeId?draft.homeScore:draft.awayScore)>=30} onClick={()=>addGoal(id)}>+ Gol · {teamName(id)}</button>)}</div>
-              {draft.goals.map((g,i)=>{const members=data.players.filter(p=>data.teams.find(t=>t.id===g.teamId)?.playerIds.includes(p.id));return <div className="goal-entry" key={i}><div className="edit-goal-heading"><strong>{teamName(g.teamId)} · Gol {draft.goals.slice(0,i+1).filter(x=>x.teamId===g.teamId).length}</strong><button type="button" className="button subtle" aria-label={`Remover gol ${i+1}`} title="Remover gol" onClick={()=>removeGoal(i)}><Trash2 size={17} aria-hidden="true"/></button></div><div className="match-grid">
-                <label>Autor<select aria-label={`Quem fez o gol ${i+1}`} value={g.ownGoal?'own':g.scorerId||''} onChange={e=>changeGoal(i,{scorerId:e.target.value==='own'?null:e.target.value||null,ownGoal:e.target.value==='own',assistId:null})}><option value="">Selecione o jogador</option>{members.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}<option value="own">Gol contra do adversário</option></select></label>
-                <label>Assistência<select aria-label={`Assistência do gol ${i+1}`} disabled={g.ownGoal||!g.scorerId} value={g.assistId||''} onChange={e=>changeGoal(i,{assistId:e.target.value||null})}><option value="">Sem assistência</option>{members.filter(p=>p.id!==g.scorerId).map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
-              </div></div>;})}
-              <p className="hint edit-goals-hint">{draft.goals.length?'Selecione o autor de cada gol. A assistência é opcional.':'Nenhum gol nesta partida. Use os botões acima para adicionar.'}</p>
-            </>}
-            <div className={'button-row'+(!isNewMatch?' edit-save-actions':'')}><button className="button subtle" onClick={()=>void confirm('Descartar esta edição?').then(ok=>{if(ok)setDraft(null);})}>{isNewMatch?'Cancelar':'Cancelar edição'}</button><button className="button primary" disabled={version!==data.etag||draft.goals.some(g=>!g.ownGoal&&!g.scorerId)} onClick={()=>void save()}>{busy?'Salvando…':isNewMatch?'Criar partida':'Salvar partida'}</button></div></fieldset>
-            {!isNewMatch&&<div className="match-delete-area">{!deleting?<button type="button" className="button danger" disabled={busy} onClick={()=>{setDeleting(true);setDeletePassword('');setDeleteError('');}}>Excluir partida</button>:<form onSubmit={e=>{e.preventDefault();void deleteMatch();}}><h4>Excluir esta partida</h4><p className="hint">O resultado, os gols e as assistências serão removidos.</p><label htmlFor="delete-match-password">Senha da pelada</label><input id="delete-match-password" type="password" autoComplete="off" maxLength={100} required value={deletePassword} disabled={busy} onChange={e=>setDeletePassword(e.target.value)}/><p className="hint">Peça a senha ao organizador para excluir esta partida.</p>{deleteError&&<p role="alert" className="error-text">{deleteError}</p>}<div className="button-row"><button type="button" className="button subtle" disabled={busy} onClick={()=>{setDeleting(false);setDeletePassword('');setDeleteError('');}}>Cancelar exclusão</button><button type="submit" className="button danger" disabled={busy||!deletePassword.trim()||version!==data.etag}>{busy?'Excluindo…':'Excluir partida'}</button></div></form>}</div>}
-          </section>}
           {notice&&<div className={'match-notice'+(noticeError?' error':'')} role={noticeError?'alert':'status'}>{noticeError?<Info size={18} aria-hidden="true"/>:<Check size={18} aria-hidden="true"/>}{notice}</div>}
           <section aria-label="Partidas desta pelada" className="match-list">
             {!data.matches.length?(!draft&&<div className="empty-match"><h3>Nenhuma partida ainda</h3><p>Crie a partida escolhendo os dois times. Depois, registre os gols conforme o jogo acontece.</p></div>):<>

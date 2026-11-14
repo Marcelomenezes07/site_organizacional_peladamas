@@ -29,3 +29,16 @@ it('does not advance with fewer than four names',async()=>{
   await click('Nova pelada');await input(host.querySelector('#whatslist')!,'1. Alfa\n2. Beta');await click('Revisar jogadores');
   expect(host.querySelector('#whatslist')).not.toBeNull();expect(host.textContent).toContain('pelo menos quatro');
 });
+it('keeps selection, drawing and sharing on separate task screens',async()=>{
+ const players=Array.from({length:4},(_,i)=>({id:String(i),name:`Jogador ${i}`,aliases:'',stars:3}));
+ vi.mocked(fetch).mockImplementation(async(url)=>Response.json(String(url).includes('/api/pelada')?{pelada:{teams:[],matches:[]}}:{state:{ranking:{players,etag:null},peladas:[{number:1,players,date:'2026-12-05',createdAt:'2026',etag:'v1'}]}}));
+ await click('Atualizar');expect(host.querySelector('#sourceSelect')).not.toBeNull();expect(host.querySelector('#sizeInput')).toBeNull();
+ await click('Sortear times');expect(host.querySelector('#sourceSelect')).toBeNull();expect(host.querySelector('#sizeInput')).not.toBeNull();expect(host.querySelector('.share-pelada')).toBeNull();
+ await click('Voltar');await click('Times e compartilhar');expect(host.querySelector('.share-pelada')).not.toBeNull();expect(host.querySelector('#sizeInput')).toBeNull();
+});
+it('never draws the previous pelada while a newly created one is still loading',async()=>{
+ const players=Array.from({length:4},(_,i)=>({id:String(i),name:`Jogador${i}`,aliases:'',stars:3}));
+ vi.mocked(fetch).mockImplementation(async(_url,options)=>Response.json(options?.method==='POST'?{ok:true,number:2}:{state:{ranking:{players,etag:'r1'},peladas:[{number:1,players,createdAt:'2026',etag:'old'}]}}));
+ await click('Atualizar');await click('Nova pelada');await input(host.querySelector('#whatslist')!,'1. Jogador0\n2. Jogador1\n3. Jogador2\n4. Jogador3');await click('Revisar jogadores');await click('Criar pelada e continuar');
+ expect(host.querySelector('#sizeInput')).toBeNull();expect(host.textContent).toContain('Carregando a pelada');
+});

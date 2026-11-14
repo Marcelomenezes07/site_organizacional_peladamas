@@ -1,3 +1,4 @@
+import ScreenHeader from './components/ScreenHeader';
 import Stepper,{Step} from './components/Stepper';
 import JourneyNav from './components/JourneyNav';
 import './components/transitions.css';
@@ -85,7 +86,8 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const [perTeam,setPerTeam]=useState(5);
   const [drawMode,setDrawMode]=useState<DrawMode>('balanced');
   const [teams,setTeams]=useState<Team[]|null>(null);
-  const [drawOpen,setDrawOpen]=useState(false);
+  const [organizerScreen,setOrganizerScreen]=useState<'overview'|'draw'|'share'>('overview');
+  const [resultTeam,setResultTeam]=useState(0);
   const [copied,setCopied]=useState(false);
   const [lastSync,setLastSync]=useState<Date|null>(null);
   const savingRef=useRef(false);
@@ -181,7 +183,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     try{
       const p=preview.map(({id,name,aliases,stars})=>({id,name,aliases,stars}));
       const answer=await remote<{ok:boolean;number:number;addedToRanking?:number;warning?:string}>('POST',{action:'createPelada',date:peladaDate,players:p,addToRankingIds:addNewcomers?newcomers.map(p=>p.id):[]});
-      setSourceNumber(answer.number);setMode('sortear');setDrawOpen(true);setTeams(null);setPreview([]);setListText('');setCreationStep(1);setPreviewPage(0);
+      setSourceNumber(answer.number);setMode('sortear');setOrganizerScreen('draw');setTeams(null);setPreview([]);setListText('');setCreationStep(1);setPreviewPage(0);
       setFeedback(answer.warning||`Pelada ${answer.number} criada!${answer.addedToRanking?` ${answer.addedToRanking} novo(s) jogador(es) adicionado(s) ao Ranking Geral.`:' Os jogadores estão salvos e compartilhados.'}`);
     }catch(e){showMessage((e as Error).message);}
     finally{savingRef.current=false;setSaving(false);await refresh();}
@@ -202,8 +204,8 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     }catch(e){showMessage((e as Error).message);}
     finally{savingRef.current=false;setSaving(false);await refresh();}
   };
-  const activePelada:Pelada|undefined=state?.peladas.find(p=>p.number===(sourceNumber??state.peladas[0]?.number))||state?.peladas[0];
-  const selectPelada=(value:number)=>{setSourceNumber(value);setDrawOpen(false);setTeams(null);setCopied(false);};
+  const activePelada:Pelada|undefined=state?.peladas.find(p=>p.number===(sourceNumber??state.peladas[0]?.number));
+  const selectPelada=(value:number)=>{setSourceNumber(value);setOrganizerScreen('overview');setTeams(null);setCopied(false);};
   const drawTeams=async()=>{
     if(!activePelada||savingRef.current)return;
     savingRef.current=true;saveGenerationRef.current++;setSaving(true);setFeedback('');
@@ -213,7 +215,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
       if(published.teams.length&&!await confirm('Sortear novamente e substituir os times publicados desta pelada?'))return;
       const result=sortTeams(activePelada.players,perTeam,drawMode);
       await changePelada(activePelada.number,{action:'publishTeams',teams:result.map(t=>t.map(p=>p.id)),etag:published.etag});
-      setTeams(result);setDrawOpen(false);setCopied(false);setFeedback('Times sorteados e salvos na página pública. Você já pode copiar o link!');
+      setTeams(result);setResultTeam(0);setOrganizerScreen('share');setCopied(false);setFeedback('Times sorteados e salvos na página pública. Você já pode copiar o link!');
     }catch(e){showMessage((e as Error).message);}
     finally{savingRef.current=false;setSaving(false);await refresh();}
   };
@@ -251,7 +253,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
         {value:'peladas',label:'Peladas',icon:<History size={18} aria-hidden="true"/>},
         {value:'criar',label:'Nova pelada',icon:<Plus size={18} aria-hidden="true"/>},
         {value:'ranking',label:'Ranking geral',icon:<Trophy size={18} aria-hidden="true"/>}
-      ]} onChange={value=>{setTab(value==='ranking'?'ranking':'sorteio');if(value!=='ranking')setMode(value==='criar'?'criar':'sortear');setFeedback('');}}/>
+      ]} onChange={value=>{setTab(value==='ranking'?'ranking':'sorteio');if(value!=='ranking'){setMode(value==='criar'?'criar':'sortear');setOrganizerScreen('overview');}setFeedback('');}}/>
 
 
       {!!state?.pendingDeletions?.length&&<div className="panel"><h3>Arquivos com exclusão pendente</h3><p>Estas peladas já estão desativadas. Conclua a remoção dos arquivos antigos.</p>{state.pendingDeletions.map(number=><button key={number} className="button danger" disabled={saving} onClick={()=>void deletePelada(number)}>Concluir exclusão da Pelada {number}</button>)}</div>}
@@ -301,7 +303,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           {feedback&&<div role="status" aria-live="polite" className={'feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
         </div>
       </>:<>
-        <div className="organization-heading journey-heading"><div><span className="eyebrow">ORGANIZAÇÃO</span><h2>{mode==='criar'?'Nova pelada':'Suas peladas'}</h2><p>{mode==='criar'?'Da lista aos times, um passo de cada vez.':'Escolha a pelada para organizar os times e compartilhar.'}</p></div></div>
+        <div className="organization-heading journey-heading" hidden={mode==='sortear'&&organizerScreen!=='overview'}><div><span className="eyebrow">ORGANIZAÇÃO</span><h2>{mode==='criar'?'Nova pelada':'Suas peladas'}</h2><p>{mode==='criar'?'Da lista aos times, um passo de cada vez.':'Escolha a pelada para organizar os times e compartilhar.'}</p></div></div>
         {mode==='criar'?<div ref={flowRef} className="creation-flow"><Stepper step={creationStep} onStepChange={step=>{if(step===1)moveToStep(1);else if(preview.length>=4&&validPeladaDate(peladaDate))moveToStep(2);}} linear showFooter={false} theme="light" accentColor="#08764f" frame={false} width="100%" transition="slide">
           <Step title="Data e lista"><div className="panel"><div className="panel-heading"><div><h3>Cole a lista do WhatsApp</h3><p>Vamos reconhecer os nomes e apelidos do ranking.</p></div></div>
             <label className="form-label" htmlFor="peladaDate">Data da pelada</label><input id="peladaDate" type="date" min="1900-01-01" max="9999-12-31" required value={peladaDate} onChange={e=>setPeladaDate(e.target.value)} style={{marginBottom:16}}/>
@@ -319,26 +321,29 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
             <p className="help-center">A lista será salva. Em seguida, confira os jogadores e sorteie os times.</p>
           </div></Step></Stepper></div>
         :<>
-          {!activePelada?<div className="panel"><Empty icon={<FilePlus2 size={28}/>} heading="Ainda não há peladas" detail="Crie a primeira pelada colando a lista do WhatsApp."/><button className="button primary full" onClick={()=>setMode('criar')}><Plus size={17}/> Criar primeira pelada</button></div>:<>
-            <div className="panel selector-card"><label className="form-label" htmlFor="sourceSelect">Escolha a pelada</label><div className="select-wrap"><select id="sourceSelect" className="main-select" value={activePelada.number} onChange={e=>selectPelada(Number(e.target.value))}>{state.peladas.map((p,i)=><option key={p.number} value={p.number}>{i===0?'Última — ':''}{p.date?`Pelada · ${formatPeladaDate(p.date)}`:`Pelada ${p.number}`} · {p.players.length} jogadores</option>)}</select><ChevronDown size={17}/></div>
+          {!activePelada?<div className="panel"><Empty icon={<FilePlus2 size={28}/>} heading={sourceNumber!==null?'Carregando a pelada…':'Ainda não há peladas'} detail={sourceNumber!==null?'Atualizando os dados da pelada selecionada.':'Crie a primeira pelada colando a lista do WhatsApp.'}/><button className="button primary full" onClick={()=>{if(sourceNumber!==null){setSourceNumber(null);setOrganizerScreen('overview');}else setMode('criar');}}><Plus size={17}/> {sourceNumber!==null?'Voltar às peladas':'Criar primeira pelada'}</button></div>:<>
+            {organizerScreen==='overview'&&<><div className="panel selector-card"><label className="form-label" htmlFor="sourceSelect">Escolha a pelada</label><div className="select-wrap"><select id="sourceSelect" className="main-select" value={activePelada.number} onChange={e=>selectPelada(Number(e.target.value))}>{state.peladas.map((p,i)=><option key={p.number} value={p.number}>{i===0?'Última — ':''}{p.date?`Pelada · ${formatPeladaDate(p.date)}`:`Pelada ${p.number}`} · {p.players.length} jogadores</option>)}</select><ChevronDown size={17}/></div>
             <div className="hint"><History size={15}/> Os times, a página e o link abaixo pertencem a esta pelada.</div></div>
-            <PeladaLinks key={activePelada.number} number={activePelada.number} version={activePelada.etag}/>
+            <div className="ds-task-actions"><button className="button primary" onClick={()=>setOrganizerScreen('draw')}><Shuffle size={18}/> Sortear times</button><button className="button subtle" onClick={()=>setOrganizerScreen('share')}><ArrowRight size={18}/> Times e compartilhar</button></div>
             <details className="panel roster-review" key={`roster-${activePelada.number}`}><summary>Conferir os {activePelada.players.length} jogadores <ChevronDown size={18}/></summary><div className="panel-heading"><div><h3>Jogadores da Pelada {activePelada.number}</h3><p>Estas notas serão usadas no sorteio.</p></div><button className="icon-button" title="Baixar CSV" onClick={()=>exportCSV(`pelada_${activePelada.number}.csv`,peladaToCsv(activePelada))}><ArrowDownToLine size={19}/></button></div>
               <div className="roster-grid">{ordered(activePelada.players).map(p=><div className="roster-player" key={p.id}><span className="roster-dot"/><span>{p.name}</span><strong>{formatStars(p.stars)} ★</strong></div>)}</div>
               <button type="button" className="button subtle" onClick={()=>{void setRankingView(String(activePelada.number));setTab('ranking');}}>Corrigir notas desta pelada</button>
             </details>
-            <details className="panel draw-settings" key={`draw-${activePelada.number}`} open={drawOpen} onToggle={e=>setDrawOpen(e.currentTarget.open)}><summary className="settings-title"><Settings2 size={19}/> Configurar sorteio <ChevronDown size={18}/></summary><h3 className="sr-only"><Settings2 size={19}/> Sortear times da Pelada {activePelada.number}</h3>
+            <details className="manage-pelada"><summary>Gerenciar Pelada {activePelada.number}<ChevronDown size={17}/></summary><p>Excluir remove os jogos e o histórico desta pelada. O Ranking Geral é mantido.</p><button className="button danger" disabled={saving} onClick={()=>void deletePelada(activePelada.number)}><Trash2 size={16}/> Excluir Pelada {activePelada.number}</button></details></>}
+            {organizerScreen!=='overview'&&<ScreenHeader title={organizerScreen==='draw'?'Sortear times':'Times e compartilhamento'} context={activePelada.date?`Pelada · ${formatPeladaDate(activePelada.date)}`:`Pelada ${activePelada.number}`} onBack={()=>setOrganizerScreen('overview')} disabled={saving}/>}
+            {organizerScreen==='draw'&&<div className="panel draw-settings ds-task-panel"><h3 className="sr-only"><Settings2 size={19}/> Sortear times da Pelada {activePelada.number}</h3>
               <div className="setting-row"><label htmlFor="sizeInput">Jogadores por time</label><div className="select-wrap small"><select id="sizeInput" value={perTeam} onChange={e=>{setPerTeam(Number(e.target.value));setTeams(null);}}>{[4,5,6,7,8,9,10,11].map(n=><option key={n} value={n}>{n}</option>)}</select><ChevronDown size={15}/></div></div>
               <div className="draw-mode"><label className="form-label" htmlFor="drawMode">Como equilibrar os times</label><select id="drawMode" className="main-select" value={drawMode} onChange={e=>{setDrawMode(e.target.value as DrawMode);setTeams(null);}}><option value="balanced">Equilíbrio geral (recomendado)</option><option value="tiers">Por faixas de habilidade</option><option value="balanced-five-stars">Equilíbrio geral + separação dos 5 estrelas</option></select><details className="inline-help"><summary>Como funciona o equilíbrio</summary><p className="hint">{drawMode==='balanced'?'Busca médias próximas e distribui os jogadores mais fortes entre os times.':drawMode==='balanced-five-stars'?'Distribui os jogadores de 5 estrelas entre os times, com diferença máxima de um por time, e busca médias próximas.':'Dá mais peso à distribuição das faixas: até 2, de 2,5 a 3,5 e de 4 a 5 estrelas, mantendo as médias próximas.'}</p>
               <div className="hint"><Info size={15}/> Considera apenas os convocados, sem regras fixas por nome. Todos participam; se sobrarem jogadores, os times terão tamanhos diferentes e o equilíbrio será calculado pela média.</div></details></div>
               <button className="button primary full big-sort" disabled={saving} onClick={()=>void drawTeams()}><Shuffle size={19}/> {saving?'Salvando sorteio…':teams?'Sortear novamente':'Sortear times'}</button><p className="hint">{Math.max(2,Math.ceil(activePelada.players.length/perTeam))} times previstos · O sorteio é salvo automaticamente.</p>
-            </details>
-            {teams&&<div className="results"><div className="results-heading"><div><span className="eyebrow">RESULTADO DO SORTEIO</span><h3>Times da Pelada {activePelada.number}</h3></div><span className="result-tag"><CheckCircle2 size={14}/> {drawMode==='balanced'?'Equilíbrio geral':drawMode==='balanced-five-stars'?'Equilíbrio geral + separação dos 5 estrelas':'Por faixas'}</span></div>
-              <p className="hint">Diferença entre médias: {formatStars(Math.max(...teams.map(t=>teamTotal(t)/t.length))-Math.min(...teams.map(t=>teamTotal(t)/t.length)))} ★ · O resultado depende das notas informadas.</p><div className="teams-grid">{teams.map((team,i)=><div className="team-card" key={i}><div className="team-head"><strong><span>{teamEmojis[i%teamEmojis.length]}</span> TIME {i+1}</strong><span>{formatStars(teamTotal(team))} ⭐</span></div><div className="team-body">{team.map((p,j)=><div className="team-member" key={p.id}><span><small>{String(j+1).padStart(2,'0')}</small>{p.name}</span><em>{formatStars(p.stars)}</em></div>)}</div><div className="team-footer">Média: <strong>{formatStars(teamTotal(team)/team.length)} ⭐</strong></div></div>)}</div>
-              <div className="panel copy-panel"><h3><Clipboard size={18}/> Pronto para o WhatsApp</h3><textarea readOnly value={messageForTeams(teams,activePelada.number)} aria-label="Texto dos times" rows={Math.min(27,teams.flat().length+teams.length*3+3)}/>
-              <button className="button primary full" onClick={()=>void copyTeams()}>{copied?<Check size={18}/>:<Copy size={18}/>} {copied?'Copiado!':'Copiar os times'}</button></div>
             </div>}
-            <details className="manage-pelada"><summary>Gerenciar Pelada {activePelada.number}<ChevronDown size={17}/></summary><p>Excluir remove os jogos e o histórico desta pelada. O Ranking Geral é mantido.</p><button className="button danger" disabled={saving} onClick={()=>void deletePelada(activePelada.number)}><Trash2 size={16}/> Excluir Pelada {activePelada.number}</button></details>
+            {organizerScreen==='share'&&<><PeladaLinks key={activePelada.number} number={activePelada.number} version={activePelada.etag}/>
+            {teams&&<div className="results"><div className="results-heading"><div><span className="eyebrow">RESULTADO DO SORTEIO</span><h3>Times da Pelada {activePelada.number}</h3></div><span className="result-tag"><CheckCircle2 size={14}/> {drawMode==='balanced'?'Equilíbrio geral':drawMode==='balanced-five-stars'?'Equilíbrio geral + separação dos 5 estrelas':'Por faixas'}</span></div>
+              <p className="hint">Diferença entre médias: {formatStars(Math.max(...teams.map(t=>teamTotal(t)/t.length))-Math.min(...teams.map(t=>teamTotal(t)/t.length)))} ★ · O resultado depende das notas informadas.</p><JourneyNav label="Times sorteados" value={String(resultTeam)} items={teams.map((_,i)=>({value:String(i),label:`Time ${i+1}`,icon:<Users size={15}/>}))} onChange={value=>setResultTeam(Number(value))}/><div className="teams-grid ds-single-team">{teams.map((team,i)=>i===resultTeam&&<div className="team-card" key={i}><div className="team-head"><strong><span>{teamEmojis[i%teamEmojis.length]}</span> TIME {i+1}</strong><span>{formatStars(teamTotal(team))} ⭐</span></div><div className="team-body">{team.map((p,j)=><div className="team-member" key={p.id}><span><small>{String(j+1).padStart(2,'0')}</small>{p.name}</span><em>{formatStars(p.stars)}</em></div>)}</div><div className="team-footer">Média: <strong>{formatStars(teamTotal(team)/team.length)} ⭐</strong></div></div>)}</div>
+              <details className="panel copy-panel"><summary><Clipboard size={18}/> Texto dos times para WhatsApp <ChevronDown size={17}/></summary><textarea readOnly value={messageForTeams(teams,activePelada.number)} aria-label="Texto dos times" rows={Math.min(27,teams.flat().length+teams.length*3+3)}/>
+              <button className="button primary full" onClick={()=>void copyTeams()}>{copied?<Check size={18}/>:<Copy size={18}/>} {copied?'Copiado!':'Copiar os times'}</button></details>
+            </div>}
+            {!teams&&<p className="hint">Os times já publicados podem ser conferidos em Abrir página da pelada.</p>}</>}
           </>}
         </>}
         {feedback&&<div role="status" aria-live="polite" className={'feedback bottom-feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
