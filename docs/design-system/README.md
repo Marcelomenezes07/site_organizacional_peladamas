@@ -63,3 +63,5 @@ Skills consultadas:
 - [React Bits](https://github.com/Philotheephilix/reactbits.dev-skill): Stepper original já integrado permanece no fluxo; nenhum efeito adicional pesado é necessário.
 
 Validação: build, 80 testes, auditoria axe WCAG A/AA e overflow em 320/390/768/1440, dados fictícios no navegador. Não substitui teste em aparelhos físicos.
+
+Ajuste da grade: os jogadores agora usam linhas compactas em verde suave, como a lista da pelada. Tocar no nome abre somente as estrelas; selecionar a nota fecha o seletor e mantém a alteração no rascunho para salvar. Nome e apelidos continuam disponíveis na visualização Lista. O detalhe vertical decorativo do seletor de pelada foi removido e o botão de corrigir notas segue o fluxo abaixo da lista, com espaçamento próprio.

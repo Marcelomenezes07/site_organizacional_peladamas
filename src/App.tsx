@@ -76,6 +76,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const [search,setSearch]=useState('');
   const [rankingLayout,setRankingLayout]=useState<'list'|'grid'>('grid');
   const [rankingPage,setRankingPage]=useState(0);
+  const [ratingPlayer,setRatingPlayer]=useState<string|null>(null);
   const [newName,setNewName]=useState('');
   const [newAliases,setNewAliases]=useState('');
   const [newStars,setNewStars]=useState(3);
@@ -292,11 +293,11 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
               <div className={'ranking-row'+(editingPlayer===p.id?' editing-player':'')} key={p.id} role="row">
                 <span className="rank-position" role="cell">{stableRanking.findIndex(x=>x.id===p.id)+1}</span>
                 <div className="player-info" role="cell" id={`player-${p.id}`}>
-                  {view==='geral'&&editingPlayer===p.id?<label className="ranking-field"><span>Nome</span><input className="inline-name" value={p.name} onChange={e=>modifyPlayer(p.id,{name:e.target.value})} aria-label={`Nome de ${p.name}`}/></label>:<strong>{p.name}</strong>}
+                  {view==='geral'&&editingPlayer===p.id?<label className="ranking-field"><span>Nome</span><input className="inline-name" value={p.name} onChange={e=>modifyPlayer(p.id,{name:e.target.value})} aria-label={`Nome de ${p.name}`}/></label>:rankingLayout==='grid'?<button type="button" className="ranking-player-name" aria-label={`Alterar estrelas de ${p.name}`} aria-expanded={ratingPlayer===p.id} onClick={()=>setRatingPlayer(ratingPlayer===p.id?null:p.id)}>{p.name}</button>:<strong>{p.name}</strong>}
                   {view==='geral'&&editingPlayer===p.id?<label className="ranking-field"><span>Apelidos</span><input className="alias" value={p.aliases} placeholder="Apelidos (separar por |)" onChange={e=>modifyPlayer(p.id,{aliases:e.target.value})} aria-label={`Apelidos de ${p.name}`}/></label>:<span className="alias-static">{view==='geral'?p.aliases:`Pelada ${view}`}</span>}
                   {view==='geral'&&editingPlayer===p.id&&<button className="button subtle remove-player" onClick={()=>void deletePlayer(p.id)}><Trash2 size={16}/> Excluir jogador</button>}
                 </div>
-                <div role="cell" className="ranking-rating"><span className="touch-label">Estrelas</span><StarsSelect value={p.stars} ariaLabel={`Estrelas de ${p.name}`} onChange={s=>modifyPlayer(p.id,{stars:s})}/></div>
+                <div role="cell" className="ranking-rating"><span className="touch-label">Estrelas</span>{rankingLayout==='list'||ratingPlayer===p.id||editingPlayer===p.id?<StarsSelect value={p.stars} ariaLabel={`Estrelas de ${p.name}`} onChange={s=>{modifyPlayer(p.id,{stars:s});setRatingPlayer(null);}}/>:<strong className="ranking-static-stars">{formatStars(p.stars)} ★</strong>}</div>
                 <div role="cell" className="ranking-actions">{view==='geral'?<button className="icon-button" aria-label={`${editingPlayer===p.id?'Fechar edição de':'Editar'} ${p.name}`} aria-expanded={editingPlayer===p.id} aria-controls={`player-${p.id}`} onClick={()=>setEditingPlayer(editingPlayer===p.id?null:p.id)}>{editingPlayer===p.id?<X size={17}/>:<PencilLine size={17}/>}</button>:<button className="delete-button" onClick={()=>deletePlayer(p.id)} aria-label={`Excluir ${p.name}`} title="Excluir deste ranking"><Trash2 size={17}/></button>}</div>
               </div>)}
           </div></div>
@@ -334,7 +335,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
             <div className="ds-task-actions"><button className="button primary" aria-label="Sortear times" onClick={()=>setOrganizerScreen('draw')}><Shuffle size={18} aria-hidden="true"/><span>Sortear times</span><small>Equilibre os times da pelada</small></button><button className="button subtle" aria-label="Times e compartilhar" onClick={()=>setOrganizerScreen('share')}><ArrowRight size={18} aria-hidden="true"/><span>Times e compartilhar</span><small>Confira e envie o link ao grupo</small></button></div>
             <details className="panel roster-review" key={`roster-${activePelada.number}`}><summary>Conferir os {activePelada.players.length} jogadores <ChevronDown size={18}/></summary><div className="panel-heading"><div><h3>Jogadores da Pelada {activePelada.number}</h3><p>Estas notas serão usadas no sorteio.</p></div><button className="icon-button" title="Baixar CSV" onClick={()=>exportCSV(`pelada_${activePelada.number}.csv`,peladaToCsv(activePelada))}><ArrowDownToLine size={19}/></button></div>
               <div className="roster-grid">{ordered(activePelada.players).map(p=><div className="roster-player" key={p.id}><span className="roster-dot"/><span>{p.name}</span><strong>{formatStars(p.stars)} ★</strong></div>)}</div>
-              <button type="button" className="button subtle" onClick={()=>{void setRankingView(String(activePelada.number));setTab('ranking');}}>Corrigir notas desta pelada</button>
+              <button type="button" className="button subtle roster-correct-notes" onClick={()=>{void setRankingView(String(activePelada.number));setTab('ranking');}}>Corrigir notas desta pelada</button>
             </details>
             <details className="manage-pelada"><summary>Gerenciar Pelada {activePelada.number}<ChevronDown size={17}/></summary><p>Excluir remove os jogos e o histórico desta pelada. O Ranking Geral é mantido.</p><button className="button danger" disabled={saving} onClick={()=>void deletePelada(activePelada.number)}><Trash2 size={16}/> Excluir Pelada {activePelada.number}</button></details></>}
             {organizerScreen!=='overview'&&<ScreenHeader title={organizerScreen==='draw'?'Sortear times':'Times e compartilhamento'} context={activePelada.date?`Pelada · ${formatPeladaDate(activePelada.date)}`:`Pelada ${activePelada.number}`} onBack={()=>setOrganizerScreen('overview')} disabled={saving}/>}
