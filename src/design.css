@@ -433,3 +433,60 @@ footer{padding:24px 0}.footer-mark{font-size:14px;opacity:1}.public-footer{paddi
  .public-pelada .edit-existing .match-delete-area form {padding:14px}
  .public-pelada .edit-existing .match-delete-area .button-row {display:grid;grid-template-columns:1fr}
 }
+
+/* Journey: one task per screen, preserving the Peladamas brand and team palette. */
+:root {--tabs-text-muted:#59685f;--tabs-text-active:#174d34;--tabs-bar-bg:#e7eee8;--tabs-pill-bg:#fff}
+.journey-nav.t-tabs {display:flex;width:100%;border-radius:14px;margin:0 0 28px;padding:4px;gap:4px}
+.journey-nav .t-tab {display:flex;align-items:center;justify-content:center;flex:1;gap:8px;height:48px;min-width:0;border-radius:10px;padding:10px 12px;font-family:inherit;font-size:14px;font-weight:600;color:var(--tabs-text-muted)}
+.journey-nav .t-tab[aria-pressed='true'] {color:var(--tabs-text-active)}
+.journey-nav .t-tabs-pill {top:4px;height:48px;border-radius:10px;box-shadow:0 2px 5px #102f2708}
+.journey-nav .t-tab:focus-visible {outline:2px solid #145bd6;outline-offset:-2px}
+.journey-heading {margin:0 0 24px}
+.journey-heading h2 {margin:5px 0 6px;font-size:28px;letter-spacing:-.7px}
+.journey-heading p {font-size:14px;color:#59685f;margin:0;line-height:1.5}
+.creation-flow {scroll-margin-top:20px}
+.creation-flow .stepper {--stepper-ink:#24352e!important;--stepper-muted:#59685f!important;--stepper-well:#edf3ee!important;--stepper-tile:#fff!important;--stepper-tile-shadow:none!important}
+.creation-flow .stepper__header {margin-bottom:20px}
+.creation-flow .stepper__marker {min-height:44px}
+.creation-flow .stepper__pane {outline:none}
+.creation-flow .stepper__pane--leaving {pointer-events:none}
+.creation-flow .panel {margin:0;border:1px solid #dce3dc;box-shadow:0 3px 16px #102f2704}
+.creation-flow .whatsapp-textarea {min-height:175px;max-height:260px;font-size:16px;resize:vertical}
+.creation-flow .panel-heading {margin-bottom:18px}
+.creation-flow .notice {font-size:12px;line-height:1.5;margin-bottom:16px;padding:12px}
+.creation-flow .preview-row {padding:8px 10px;min-height:60px}
+.creation-flow .preview-name input {font-size:16px;min-height:40px}
+.creation-flow .preview-row select {min-height:44px;font-size:16px}
+.creation-flow .preview-row .delete-button {min-height:44px;min-width:44px}
+.review-pagination {display:flex;justify-content:space-between;align-items:center;gap:12px;margin:16px 0 20px}
+.review-pagination span {font-size:12px;color:#59685f;white-space:nowrap}
+.review-pagination .button {min-height:44px;font-size:12px}
+.creation-actions {display:flex;gap:12px;border-top:1px solid #e2e9e3;padding-top:18px;align-items:center}
+.creation-actions>.button {min-height:48px}
+.creation-actions>.primary {flex:1}
+.creation-actions>.subtle {flex-shrink:0}
+.draw-settings>summary {display:flex;align-items:center;gap:10px;cursor:pointer;min-height:48px;list-style:none;font-weight:700;color:#24352e;font-size:17px}
+.draw-settings>summary::-webkit-details-marker {display:none}
+.draw-settings>summary svg:last-child {margin-left:auto;transition:transform 200ms ease}
+.draw-settings[open]>summary {margin-bottom:16px}
+.draw-settings[open]>summary svg:last-child {transform:rotate(180deg)}
+.draw-settings:not([open]) {padding-top:12px;padding-bottom:12px}
+@media(max-width:600px){
+ .journey-nav.t-tabs {margin-bottom:24px}
+ .journey-nav .t-tab {font-size:12px;gap:5px;padding:8px 4px}
+ .journey-nav .t-tab svg {width:16px;height:16px;flex-shrink:0}
+ .journey-heading h2 {font-size:25px}
+ .creation-flow .panel {padding:18px 14px}
+ .creation-flow .panel-heading h3 {font-size:20px}
+ .creation-flow .notice {font-size:11px}
+ .creation-flow .preview-row {gap:8px;padding:5px 8px}
+ .creation-flow .preview-name {min-width:0}
+ .creation-flow .preview-row select {padding:8px 6px}
+ .creation-actions {flex-direction:column-reverse;gap:8px}
+ .creation-actions>.button {width:100%;justify-content:center}
+ .review-pagination {gap:8px}
+ .draw-settings>summary {font-size:16px}
+}
+@media(prefers-reduced-motion:reduce){
+ .creation-flow *, .draw-settings>summary svg {animation:none!important;transition:none!important}
+}

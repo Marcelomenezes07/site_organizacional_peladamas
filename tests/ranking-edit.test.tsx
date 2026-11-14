@@ -10,7 +10,7 @@ beforeEach(async()=>{
  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
  state={ranking:{etag:'v1',players:[{id:'a',name:'Alfa',aliases:'Capitão',stars:5},{id:'b',name:'Beta',aliases:'',stars:3}]},peladas:[]};
  vi.stubGlobal('fetch',vi.fn(async(_url,options)=>{if(options?.method==='POST'){const body=JSON.parse(options.body);state.ranking={players:body.players,etag:'v2'};return Response.json({ok:true});}return Response.json({state});}));
- host=document.createElement('div');document.body.append(host);root=createRoot(host);await act(async()=>root.render(<App onLogout={async()=>{}}/>));
+ host=document.createElement('div');document.body.append(host);root=createRoot(host);await act(async()=>root.render(<App onLogout={async()=>{}}/>));await click('Ranking geral');
 });
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();});
 it('keeps rows compact and opens only the chosen player editor',async()=>{

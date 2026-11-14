@@ -1,4 +1,7 @@
-import {todayLocal,validPeladaDate} from '../lib/pelada-date';
+import Stepper,{Step} from './components/Stepper';
+import JourneyNav from './components/JourneyNav';
+import './components/transitions.css';
+import {todayLocal,validPeladaDate,formatPeladaDate} from '../lib/pelada-date';
 import {getPelada,changePelada} from './pelada-api';
 import PeladaLinks from './PeladaLinks';
 import { useConfirmation } from './useConfirmation';
@@ -56,7 +59,10 @@ function Empty({icon,heading,detail}:{icon:ReactNode;heading:string;detail:strin
 export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const {confirm,confirmation}=useConfirmation();
   const [state,setState]=useState<AppState|null>(null);
-  const [tab,setTab]=useState<Tab>('ranking');
+  const [tab,setTab]=useState<Tab>('sorteio');
+  const [creationStep,setCreationStep]=useState(1),[previewPage,setPreviewPage]=useState(0);
+  const flowRef=useRef<HTMLDivElement>(null);
+  const moveToStep=(step:number)=>{setCreationStep(step);flowRef.current?.scrollIntoView?.({block:'start',behavior:'auto'});};
   const [mode,setMode]=useState<Mode>('sortear');
   const [view,setView]=useState('geral');
   const [draft,setDraft]=useState<Player[]>([]);
@@ -79,6 +85,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const [perTeam,setPerTeam]=useState(5);
   const [drawMode,setDrawMode]=useState<DrawMode>('balanced');
   const [teams,setTeams]=useState<Team[]|null>(null);
+  const [drawOpen,setDrawOpen]=useState(false);
   const [copied,setCopied]=useState(false);
   const [lastSync,setLastSync]=useState<Date|null>(null);
   const savingRef=useRef(false);
@@ -151,6 +158,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
 
   const analyze=()=>{
     if(!state)return;
+    if(preview.length>=4&&validPeladaDate(peladaDate)){moveToStep(2);return;}
     const entries=parseWhatsAppList(listText);
     if(entries.length===0){showMessage('Cole uma lista com pelo menos quatro nomes.');return;}
     const seen=new Set<string>();
@@ -160,7 +168,8 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
       if(seen.has(item.id))return null;
       seen.add(item.id);return item;
     }).filter((x):x is PreviewPlayer=>x!==null);
-    setPreview(result);setFeedback('');
+    setPreview(result);setPreviewPage(0);setFeedback('');
+    if(result.length>=4&&validPeladaDate(peladaDate))moveToStep(2);
     if(result.length<4)showMessage('Adicione pelo menos quatro jogadores antes de criar a pelada.');
   };
   const createPelada=async()=>{
@@ -172,7 +181,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     try{
       const p=preview.map(({id,name,aliases,stars})=>({id,name,aliases,stars}));
       const answer=await remote<{ok:boolean;number:number;addedToRanking?:number;warning?:string}>('POST',{action:'createPelada',date:peladaDate,players:p,addToRankingIds:addNewcomers?newcomers.map(p=>p.id):[]});
-      setSourceNumber(answer.number);setMode('sortear');setTeams(null);setPreview([]);setListText('');
+      setSourceNumber(answer.number);setMode('sortear');setDrawOpen(true);setTeams(null);setPreview([]);setListText('');setCreationStep(1);setPreviewPage(0);
       setFeedback(answer.warning||`Pelada ${answer.number} criada!${answer.addedToRanking?` ${answer.addedToRanking} novo(s) jogador(es) adicionado(s) ao Ranking Geral.`:' Os jogadores estão salvos e compartilhados.'}`);
     }catch(e){showMessage((e as Error).message);}
     finally{savingRef.current=false;setSaving(false);await refresh();}
@@ -194,7 +203,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     finally{savingRef.current=false;setSaving(false);await refresh();}
   };
   const activePelada:Pelada|undefined=state?.peladas.find(p=>p.number===(sourceNumber??state.peladas[0]?.number))||state?.peladas[0];
-  const selectPelada=(value:number)=>{setSourceNumber(value);setTeams(null);setCopied(false);};
+  const selectPelada=(value:number)=>{setSourceNumber(value);setDrawOpen(false);setTeams(null);setCopied(false);};
   const drawTeams=async()=>{
     if(!activePelada||savingRef.current)return;
     savingRef.current=true;saveGenerationRef.current++;setSaving(true);setFeedback('');
@@ -204,7 +213,7 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
       if(published.teams.length&&!await confirm('Sortear novamente e substituir os times publicados desta pelada?'))return;
       const result=sortTeams(activePelada.players,perTeam,drawMode);
       await changePelada(activePelada.number,{action:'publishTeams',teams:result.map(t=>t.map(p=>p.id)),etag:published.etag});
-      setTeams(result);setCopied(false);setFeedback('Times sorteados e salvos na página pública. Você já pode copiar o link!');
+      setTeams(result);setDrawOpen(false);setCopied(false);setFeedback('Times sorteados e salvos na página pública. Você já pode copiar o link!');
     }catch(e){showMessage((e as Error).message);}
     finally{savingRef.current=false;setSaving(false);await refresh();}
   };
@@ -213,12 +222,13 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     try{await navigator.clipboard.writeText(messageForTeams(teams,activePelada.number));setCopied(true);setTimeout(()=>setCopied(false),2200);}
     catch{showMessage('Não foi possível copiar automaticamente. Selecione o texto na caixa abaixo.');}
   };
-  const countNext=state?.nextPeladaNumber??((state?.peladas.reduce((m,p)=>Math.max(m,p.number),0)||0)+1);
   const savedOrder=new Map(ordered(state?currentList(state,view)?.players||[]:[]).map((p,i)=>[p.id,i]));
   const stableRanking=[...draft].sort((a,b)=>(savedOrder.get(a.id)??Number.MAX_SAFE_INTEGER)-(savedOrder.get(b.id)??Number.MAX_SAFE_INTEGER));
   const rankRows=stableRanking.filter(p=>normalize(`${p.name} ${p.aliases}`).includes(normalize(search)));
   const rankAvg=draft.length?draft.reduce((s,p)=>s+p.stars,0)/draft.length:0;
   const unknownCount=preview.filter(p=>p.unmatched).length;
+  const reviewPageCount=Math.max(1,Math.ceil(preview.length/4));
+  const reviewPage=Math.min(previewPage,reviewPageCount-1);
 
   return <div className="app">
     {confirmation}
@@ -237,10 +247,12 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
     <main className="main">
       <div className="topline"><button className="refresh" onClick={async()=>{if(dirty&&!await confirm('Sair sem salvar as alterações?'))return;void onLogout().catch(e=>showMessage(e.message));}}>Sair</button><button className="refresh" onClick={()=>void refresh()} title="Atualizar dados"><RefreshCw size={15}/> Atualizar</button></div>
 
-      <nav className="tabs" aria-label="Áreas do Peladamas">
-        <button type="button" aria-pressed={tab==='ranking'} onClick={()=>{setTab('ranking');setFeedback('');}} className={'tab '+(tab==='ranking'?'selected':'')}><Trophy size={18}/> Ranking geral</button>
-        <button type="button" aria-pressed={tab==='sorteio'} onClick={()=>{setTab('sorteio');setFeedback('');}} className={'tab '+(tab==='sorteio'?'selected':'')}><Shuffle size={18}/> Organizar pelada</button>
-      </nav>
+      <JourneyNav label="Áreas do Peladamas" value={tab==='ranking'?'ranking':mode==='criar'?'criar':'peladas'} items={[
+        {value:'peladas',label:'Peladas',icon:<History size={18} aria-hidden="true"/>},
+        {value:'criar',label:'Nova pelada',icon:<Plus size={18} aria-hidden="true"/>},
+        {value:'ranking',label:'Ranking geral',icon:<Trophy size={18} aria-hidden="true"/>}
+      ]} onChange={value=>{setTab(value==='ranking'?'ranking':'sorteio');if(value!=='ranking')setMode(value==='criar'?'criar':'sortear');setFeedback('');}}/>
+
 
       {!!state?.pendingDeletions?.length&&<div className="panel"><h3>Arquivos com exclusão pendente</h3><p>Estas peladas já estão desativadas. Conclua a remoção dos arquivos antigos.</p>{state.pendingDeletions.map(number=><button key={number} className="button danger" disabled={saving} onClick={()=>void deletePelada(number)}>Concluir exclusão da Pelada {number}</button>)}</div>}
       {loading?<div className="loading-screen"><LoaderCircle size={30} className="spinner"/><p>Carregando rankings...</p></div>:
@@ -289,37 +301,38 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
           {feedback&&<div role="status" aria-live="polite" className={'feedback '+(/erro|inválid|não |mudou|recarregue|repetid/i.test(feedback)?'error':'success')}>{feedback}</div>}
         </div>
       </>:<>
-        <div className="organization-heading"><h2>Organizar pelada</h2></div>
-        <div className="mode-buttons" aria-label="Organização"><button aria-pressed={mode==='criar'} className={mode==='criar'?'active':''} onClick={()=>{setMode('criar');setFeedback('');}}><FilePlus2 size={17}/> Criar pelada</button><button aria-pressed={mode==='sortear'} className={mode==='sortear'?'active':''} onClick={()=>{setMode('sortear');setFeedback('');}}><Shuffle size={17}/> Peladas criadas</button></div>
-        {mode==='criar'?<>
-          <div className="panel"><div className="panel-heading"><div><h3>Cole a lista do WhatsApp</h3><p>Vamos reconhecer os nomes e apelidos do ranking.</p></div></div>
+        <div className="organization-heading journey-heading"><div><span className="eyebrow">ORGANIZAÇÃO</span><h2>{mode==='criar'?'Nova pelada':'Suas peladas'}</h2><p>{mode==='criar'?'Da lista aos times, um passo de cada vez.':'Escolha a pelada para organizar os times e compartilhar.'}</p></div></div>
+        {mode==='criar'?<div ref={flowRef} className="creation-flow"><Stepper step={creationStep} onStepChange={step=>{if(step===1)moveToStep(1);else if(preview.length>=4&&validPeladaDate(peladaDate))moveToStep(2);}} linear showFooter={false} theme="light" accentColor="#08764f" frame={false} width="100%" transition="slide">
+          <Step title="Data e lista"><div className="panel"><div className="panel-heading"><div><h3>Cole a lista do WhatsApp</h3><p>Vamos reconhecer os nomes e apelidos do ranking.</p></div></div>
             <label className="form-label" htmlFor="peladaDate">Data da pelada</label><input id="peladaDate" type="date" min="1900-01-01" max="9999-12-31" required value={peladaDate} onChange={e=>setPeladaDate(e.target.value)} style={{marginBottom:16}}/>
             <label className="form-label" htmlFor="whatslist">Jogadores convocados</label><textarea id="whatslist" className="whatsapp-textarea" value={listText} onChange={e=>{setListText(e.target.value);setPreview([]);}} placeholder={'Peladamas quarta 21h:\n\n01. Jogador Á ✅\n02. Jogador 02 ✅\n03. Jogador 03 ✅\n04. Jogador 04 ✅\n05. Jogador 08 ✅'} rows={9}/>
             <div className="hint"><Info size={15}/> Aceita mensagens numeradas, emojis e marcações de presença. Para na “Lista de espera”.</div>
-            <button className="button primary full" onClick={analyze}><Search size={17}/> Reconhecer jogadores <ArrowRight size={16}/></button>
+            <button className="button primary full" disabled={!validPeladaDate(peladaDate)||!listText.trim()} onClick={analyze}><Search size={17}/> Revisar jogadores <ArrowRight size={16}/></button>
           </div>
-          {preview.length>0&&<div className="panel preview-panel">
-            <div className="panel-heading"><div><span className="eyebrow">PASSO 02</span><h3>Revisar Pelada {countNext}</h3><p>{preview.length} jogadores encontrados · ajuste antes de criar.</p></div><span className="label-tag">{preview.length} <Users size={13}/></span></div>
-            {unknownCount>0&&<div className="notice"><ShieldAlert size={18}/><span><strong>{unknownCount} nome(s) não encontrado(s) no ranking.</strong> Amarelo: nota provisória. Verde: nota ajustada. Ao criar a pelada, uma única pergunta permite adicionar todos os novos nomes ao Geral.</span></div>}
-            <div className="preview-players">{preview.map(p=><div key={p.id} className={'preview-row'+(p.unmatched?(p.reviewed?' newcomer-reviewed':' newcomer-pending'):'')}><div className="preview-name"><input value={p.name} aria-label="Nome do convocado" onChange={e=>setPreview(old=>old.map(x=>x.id===p.id?{...x,name:e.target.value}:x))}/>{p.unmatched&&<small>{p.reviewed?'Novo · nota ajustada':'Novo · nota provisória'}</small>}</div><StarsSelect value={p.stars} ariaLabel={`Nota de ${p.name}`} onChange={n=>setPreview(old=>old.map(x=>x.id===p.id?{...x,stars:n,reviewed:true}:x))}/><button className="delete-button" title="Remover" aria-label={`Remover ${p.name} da lista`} onClick={()=>setPreview(old=>old.filter(x=>x.id!==p.id))}><X size={17}/></button></div>)}</div>
-            <button className="button primary full" disabled={saving||!validPeladaDate(peladaDate)||preview.length<4||preview.some(p=>!p.name.trim())||new Set(preview.map(p=>normalize(p.name))).size!==preview.length} onClick={()=>void createPelada()}>{saving?<LoaderCircle size={17} className="spinner"/>:<CheckCircle2 size={17}/>} Criar Pelada {countNext} e ir para o sorteio</button>
+          </Step><Step title="Revisar e criar"><div className="panel preview-panel">
+            <div className="panel-heading"><div><span className="eyebrow">REVISÃO</span><h3>Pelada · {formatPeladaDate(peladaDate)}</h3><p>{preview.length} jogadores encontrados · ajuste antes de criar.</p></div><span className="label-tag">{preview.length} <Users size={13}/></span></div>
+            {unknownCount>0&&<div className="notice"><ShieldAlert size={18}/><span><strong>{unknownCount} novos jogadores.</strong> Revise as notas. Ao criar, você confirma uma vez a inclusão no Ranking Geral.</span></div>}
+            <div className="preview-players">{preview.slice(reviewPage*4,(reviewPage+1)*4).map(p=><div key={p.id} className={'preview-row'+(p.unmatched?(p.reviewed?' newcomer-reviewed':' newcomer-pending'):'')}><div className="preview-name"><input value={p.name} aria-label="Nome do convocado" onChange={e=>setPreview(old=>old.map(x=>x.id===p.id?{...x,name:e.target.value}:x))}/>{p.unmatched&&<small>{p.reviewed?'Novo · nota ajustada':'Novo · nota provisória'}</small>}</div><StarsSelect value={p.stars} ariaLabel={`Nota de ${p.name}`} onChange={n=>setPreview(old=>old.map(x=>x.id===p.id?{...x,stars:n,reviewed:true}:x))}/><button className="delete-button" title="Remover" aria-label={`Remover ${p.name} da lista`} onClick={()=>setPreview(old=>old.filter(x=>x.id!==p.id))}><X size={17}/></button></div>)}</div>
+            <div className="review-pagination"><button type="button" className="button subtle" disabled={reviewPage===0} onClick={()=>setPreviewPage(Math.max(0,reviewPage-1))}>Anterior</button><span>{reviewPage+1} de {reviewPageCount}</span><button type="button" className="button subtle" disabled={reviewPage+1>=reviewPageCount} onClick={()=>setPreviewPage(reviewPage+1)}>Próximos</button></div>
+            <div className="creation-actions"><button type="button" className="button subtle" disabled={saving} onClick={()=>moveToStep(1)}>Voltar à lista</button>
+            <button className="button primary full" disabled={saving||!validPeladaDate(peladaDate)||preview.length<4||preview.some(p=>!p.name.trim())||new Set(preview.map(p=>normalize(p.name))).size!==preview.length} onClick={()=>void createPelada()}>{saving?<LoaderCircle size={17} className="spinner"/>:<CheckCircle2 size={17}/>} Criar pelada e continuar</button></div>
             <p className="help-center">A lista será salva. Em seguida, confira os jogadores e sorteie os times.</p>
-          </div>}
-        </>:<>
+          </div></Step></Stepper></div>
+        :<>
           {!activePelada?<div className="panel"><Empty icon={<FilePlus2 size={28}/>} heading="Ainda não há peladas" detail="Crie a primeira pelada colando a lista do WhatsApp."/><button className="button primary full" onClick={()=>setMode('criar')}><Plus size={17}/> Criar primeira pelada</button></div>:<>
+            <div className="panel selector-card"><label className="form-label" htmlFor="sourceSelect">Escolha a pelada</label><div className="select-wrap"><select id="sourceSelect" className="main-select" value={activePelada.number} onChange={e=>selectPelada(Number(e.target.value))}>{state.peladas.map((p,i)=><option key={p.number} value={p.number}>{i===0?'Última — ':''}{p.date?`Pelada · ${formatPeladaDate(p.date)}`:`Pelada ${p.number}`} · {p.players.length} jogadores</option>)}</select><ChevronDown size={17}/></div>
+            <div className="hint"><History size={15}/> Os times, a página e o link abaixo pertencem a esta pelada.</div></div>
             <PeladaLinks key={activePelada.number} number={activePelada.number} version={activePelada.etag}/>
-            <div className="panel selector-card"><label className="form-label" htmlFor="sourceSelect">Escolha a pelada</label><div className="select-wrap"><select id="sourceSelect" className="main-select" value={activePelada.number} onChange={e=>selectPelada(Number(e.target.value))}>{state.peladas.map((p,i)=><option key={p.number} value={p.number}>{i===0?'Última — ':''}Pelada {p.number} · {p.players.length} jogadores</option>)}</select><ChevronDown size={17}/></div>
-            <div className="hint"><History size={15}/> O link acima e o sorteio usam esta pelada.</div></div>
             <details className="panel roster-review" key={`roster-${activePelada.number}`}><summary>Conferir os {activePelada.players.length} jogadores <ChevronDown size={18}/></summary><div className="panel-heading"><div><h3>Jogadores da Pelada {activePelada.number}</h3><p>Estas notas serão usadas no sorteio.</p></div><button className="icon-button" title="Baixar CSV" onClick={()=>exportCSV(`pelada_${activePelada.number}.csv`,peladaToCsv(activePelada))}><ArrowDownToLine size={19}/></button></div>
               <div className="roster-grid">{ordered(activePelada.players).map(p=><div className="roster-player" key={p.id}><span className="roster-dot"/><span>{p.name}</span><strong>{formatStars(p.stars)} ★</strong></div>)}</div>
-              <div className="hint" style={{marginTop:14}}><PencilLine size={15}/> Para corrigir as estrelas, selecione esta pelada na aba Ranking.</div>
+              <button type="button" className="button subtle" onClick={()=>{void setRankingView(String(activePelada.number));setTab('ranking');}}>Corrigir notas desta pelada</button>
             </details>
-            <div className="panel draw-settings"><h3 className="settings-title"><Settings2 size={19}/> Sortear times da Pelada {activePelada.number}</h3>
+            <details className="panel draw-settings" key={`draw-${activePelada.number}`} open={drawOpen} onToggle={e=>setDrawOpen(e.currentTarget.open)}><summary className="settings-title"><Settings2 size={19}/> Configurar sorteio <ChevronDown size={18}/></summary><h3 className="sr-only"><Settings2 size={19}/> Sortear times da Pelada {activePelada.number}</h3>
               <div className="setting-row"><label htmlFor="sizeInput">Jogadores por time</label><div className="select-wrap small"><select id="sizeInput" value={perTeam} onChange={e=>{setPerTeam(Number(e.target.value));setTeams(null);}}>{[4,5,6,7,8,9,10,11].map(n=><option key={n} value={n}>{n}</option>)}</select><ChevronDown size={15}/></div></div>
               <div className="draw-mode"><label className="form-label" htmlFor="drawMode">Como equilibrar os times</label><select id="drawMode" className="main-select" value={drawMode} onChange={e=>{setDrawMode(e.target.value as DrawMode);setTeams(null);}}><option value="balanced">Equilíbrio geral (recomendado)</option><option value="tiers">Por faixas de habilidade</option><option value="balanced-five-stars">Equilíbrio geral + separação dos 5 estrelas</option></select><details className="inline-help"><summary>Como funciona o equilíbrio</summary><p className="hint">{drawMode==='balanced'?'Busca médias próximas e distribui os jogadores mais fortes entre os times.':drawMode==='balanced-five-stars'?'Distribui os jogadores de 5 estrelas entre os times, com diferença máxima de um por time, e busca médias próximas.':'Dá mais peso à distribuição das faixas: até 2, de 2,5 a 3,5 e de 4 a 5 estrelas, mantendo as médias próximas.'}</p>
               <div className="hint"><Info size={15}/> Considera apenas os convocados, sem regras fixas por nome. Todos participam; se sobrarem jogadores, os times terão tamanhos diferentes e o equilíbrio será calculado pela média.</div></details></div>
               <button className="button primary full big-sort" disabled={saving} onClick={()=>void drawTeams()}><Shuffle size={19}/> {saving?'Salvando sorteio…':teams?'Sortear novamente':'Sortear times'}</button><p className="hint">{Math.max(2,Math.ceil(activePelada.players.length/perTeam))} times previstos · O sorteio é salvo automaticamente.</p>
-            </div>
+            </details>
             {teams&&<div className="results"><div className="results-heading"><div><span className="eyebrow">RESULTADO DO SORTEIO</span><h3>Times da Pelada {activePelada.number}</h3></div><span className="result-tag"><CheckCircle2 size={14}/> {drawMode==='balanced'?'Equilíbrio geral':drawMode==='balanced-five-stars'?'Equilíbrio geral + separação dos 5 estrelas':'Por faixas'}</span></div>
               <p className="hint">Diferença entre médias: {formatStars(Math.max(...teams.map(t=>teamTotal(t)/t.length))-Math.min(...teams.map(t=>teamTotal(t)/t.length)))} ★ · O resultado depende das notas informadas.</p><div className="teams-grid">{teams.map((team,i)=><div className="team-card" key={i}><div className="team-head"><strong><span>{teamEmojis[i%teamEmojis.length]}</span> TIME {i+1}</strong><span>{formatStars(teamTotal(team))} ⭐</span></div><div className="team-body">{team.map((p,j)=><div className="team-member" key={p.id}><span><small>{String(j+1).padStart(2,'0')}</small>{p.name}</span><em>{formatStars(p.stars)}</em></div>)}</div><div className="team-footer">Média: <strong>{formatStars(teamTotal(team)/team.length)} ⭐</strong></div></div>)}</div>
               <div className="panel copy-panel"><h3><Clipboard size={18}/> Pronto para o WhatsApp</h3><textarea readOnly value={messageForTeams(teams,activePelada.number)} aria-label="Texto dos times" rows={Math.min(27,teams.flat().length+teams.length*3+3)}/>

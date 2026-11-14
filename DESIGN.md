@@ -29,3 +29,10 @@ Cabeçalho verde escuro `#123f30`, marca branca/verde claro e controles de conex
 ## Elementos visuais preservados a pedido do usuário
 
 Cabeçalho restaurado conforme a main: gradiente #102f27 → #194b39, borda verde, logo original e tamanhos responsivos. Placar volta a mostrar as linhas do campo e os marcadores verde-claros. Jogadores retomam o contraste alternado; acesso à página da pelada recebe botão e moldura verde-claros. As melhorias de interação e simplicidade permanecem. Antes de aplicar qualquer outra proposta visual, apresentá-la ao usuário para aprovação.
+
+
+## Jornada por tarefas — design/jornada-do-usuario
+
+Pedido atual autoriza reorganizar telas, abas e botões. Esta branch parte de `feat/excluir-partida-com-senha` e preserva seus ajustes. Administrador abre em Peladas, com Nova pelada e Ranking geral na navegação principal. Criação em duas etapas reais (Data e lista; Revisar e criar), quatro jogadores por página e retorno sem perder notas. Seleção vem antes das ações de compartilhamento; acesso direto à correção do histórico e sorteio expansível. Público: Partidas, Times, Resumo; sem acesso a outras peladas. Identidade original preservada.
+
+Mapa, fontes e justificativas em [jornada-do-usuario.md](docs/ux/jornada-do-usuario.md). React Bits Stepper obtido do registro oficial, com adaptações de acessibilidade e Lucide. Transitions.dev para indicador das abas. Taste aplicada aos critérios adequados à ferramenta operacional, não ao roteiro de landing pages. Movimento reduzido respeitado. Testes: 75 aprovados, build aprovado, fluxo completo com Neon isolado, revisão em 320/390/768/1440 e axe na revisão sem violações. Não houve deploy.
