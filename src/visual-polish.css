@@ -152,3 +152,44 @@
 @media(prefers-reduced-motion:reduce){
  .button,.topline .refresh,.ranking-row,:is(input,select,textarea) {transition:none!important;transform:none!important}
 }
+
+/* Match editing / one continuous surface, quiet dividers and compact rhythm. */
+.ds-editor-minimal {background:#f3f6f2}
+.ds-editor-minimal .ds-editor-main {max-width:680px;margin:24px auto;padding:0 28px 20px;background:#fff;border:1px solid #e1e8df;border-radius:20px;box-shadow:0 10px 32px -26px #153f2833}
+.ds-editor-minimal .ds-screen-header {background:none;backdrop-filter:none;-webkit-backdrop-filter:none;border:0;border-radius:0;box-shadow:none;padding:20px 0 16px;margin:0;border-bottom:1px solid #e8eee5}
+.ds-editor-minimal .ds-screen-header h2 {font-size:22px}
+.ds-editor-minimal .ds-screen-header .ds-back {background:none;border-color:transparent;box-shadow:none!important;padding:8px;min-width:44px}
+.ds-editor-minimal .ds-editor-main .ds-team-disclosure {margin:0}
+.ds-editor-minimal .ds-team-disclosure>summary {font-size:12px;min-height:40px;font-weight:500}
+.ds-editor-minimal .ds-editor-main .edit-score {background:none;border:0;border-radius:0;box-shadow:none;margin:0 0 18px;padding:10px 0 20px;gap:6px 12px;border-bottom:1px solid #e8eee5}
+.ds-editor-minimal .edit-score-caption {display:none}
+.ds-editor-minimal .edit-score-team {font-size:14px}
+.ds-editor-minimal .ds-editor-main .edit-score strong {font-size:38px;font-weight:500}
+.ds-editor-minimal .edit-goals-heading {margin:0 0 6px}
+.ds-editor-minimal .edit-goals-heading h4 {font-size:16px;font-weight:600}
+.ds-editor-minimal .edit-add-goals {gap:12px;margin:0 0 4px;padding:0 0 8px;border-bottom:1px solid #e8eee5}
+.ds-editor-minimal .edit-add-goals .button {background:none;border-color:transparent;box-shadow:none!important;font-size:12px;min-height:44px;padding:8px;color:#326547;justify-content:flex-start}
+.ds-editor-minimal .edit-add-goals .button:hover:not(:disabled) {background:#f4f8f1;border-color:transparent;transform:none}
+.ds-editor-minimal .ds-editor-main .goal-entry {background:none;border:0;border-bottom:1px solid #e8eee5;border-radius:0;box-shadow:none;margin:0;padding:12px 48px 14px 0}
+.ds-editor-minimal .edit-goal-heading {margin:0 0 6px}
+.ds-editor-minimal .edit-goal-heading strong {font-weight:500;font-size:11px;color:#53665b}
+.ds-editor-minimal .goal-entry label {font-size:11px;font-weight:500;color:#53665b}
+.ds-editor-minimal .edit-existing .goal-entry select {background:#fff;border:0;border-bottom:1px solid #c9d9c8;border-radius:0;box-shadow:none;font-weight:500;font-size:16px;padding:6px 0;min-height:44px}
+.ds-editor-minimal .edit-goal-heading .button {right:0;color:#99645d;border-radius:8px}
+.ds-editor-minimal .edit-goals-hint {margin:12px 0;font-size:11px;line-height:1.5}
+.ds-editor-minimal .ds-editor-main .edit-save-actions {position:static;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;border:0;border-top:1px solid #e8eee5;border-radius:0;box-shadow:none;padding:16px 0 0;margin:16px 0 0;gap:10px}
+.ds-editor-minimal .edit-save-actions .subtle {background:none;border-color:transparent;box-shadow:none!important;color:#53665b}
+.ds-editor-minimal .edit-save-actions .primary {border-radius:10px;box-shadow:none!important}
+.ds-editor-minimal .ds-editor-main .match-delete-area {margin:8px 0 0;padding:0;border:0}
+.ds-editor-minimal .match-delete-area>.danger {font-size:11px;color:#8d534b;padding:8px 0;min-height:44px;background:none}
+.ds-editor-minimal .match-delete-area form {background:none;border:0;border-top:1px solid #e8eee5;border-radius:0;padding:16px 0 0;margin-top:16px}
+@media(max-width:700px){
+ .ds-editor-minimal {background:#fff}
+ .ds-editor-minimal .ds-editor-main {width:100%;max-width:680px;min-height:100dvh;margin:0 auto;padding:0 20px 16px;border:0;border-radius:0;box-shadow:none}
+ .ds-editor-minimal .ds-screen-header {padding:14px 0 12px}
+ .ds-editor-minimal .ds-screen-header h2 {font-size:21px}
+ .ds-editor-minimal .ds-editor-main .edit-score {padding:8px 0 16px;margin-bottom:16px}
+ .ds-editor-minimal .ds-editor-main .goal-entry {padding:10px 44px 12px 0}
+ .ds-editor-minimal .goal-entry .match-grid {gap:12px}
+ .ds-editor-minimal .ds-editor-main .edit-save-actions {padding:14px 0 0}
+}

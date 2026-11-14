@@ -43,3 +43,7 @@ Novas telas usam `ScreenHeader` e tokens sem copiar valores arbitrários. Novas 
 ## Acabamento visual Clubhouse
 
 A camada `src/visual-polish.css` refina o sistema para a identidade esportiva: títulos em Outfit, fundo sálvia, superfícies brancas com profundidade leve e controles com estados consistentes. Tokens `--club-team`, `--club-team-soft` e `--club-team-border` identificam os quatro times sem depender apenas da cor (o nome acompanha). Referências e decisões em [referencias-visuais.md](referencias-visuais.md).
+
+## Edição minimalista
+
+A edição existente usa `.ds-editor-minimal`: uma superfície branca contínua, linhas finas no lugar de cartões, placar sem moldura, campos com apenas borda inferior e ações alinhadas ao formulário. No celular, a superfície ocupa a tela sem borda externa. Salvar permanece a única ação preenchida. A criação de partida e as outras telas conservam seus estilos. Validação: 78 testes/build e editor em quatro larguras com axe sem violações.
