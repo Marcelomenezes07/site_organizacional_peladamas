@@ -35,7 +35,7 @@ export default function Admin(){
   if(session)return <App onLogout={logout}/>;
   return <main className="login-shell"><form className="panel login-card" onSubmit={login}>
     <div className="footer-mark"><span aria-hidden="true">⚽</span> <strong>PELA<span>DAMAS</span></strong></div>
-    <h1>Área do<br/>administrador<span className="heading-dot">.</span></h1><p className="login-description">Acesse o ranking e a organização dos times.</p>
+    <span className="arena-kicker">SEU CLUBE. SEU JOGO.</span><h1>Dentro de campo,<br/>tudo começa aqui<span className="heading-dot">.</span></h1><p className="login-description">Entre para preparar a próxima pelada.</p>
     <label htmlFor="username">Usuário</label><input id="username" autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} required maxLength={80} autoCapitalize="none" spellCheck={false}/>
     <label htmlFor="password">Senha</label><input id="password" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required maxLength={200}/>
     {error&&<p className="error-text" role="alert">{error}</p>}

@@ -4,8 +4,8 @@
   "description": "Times de pelada equilibrados",
   "start_url": "/adm",
   "display": "standalone",
-  "background_color": "#0c222a",
-  "theme_color": "#0c222a",
+  "background_color": "#0b111a",
+  "theme_color": "#0b111a",
   "icons": [
     {
       "src": "/icon-192.png",

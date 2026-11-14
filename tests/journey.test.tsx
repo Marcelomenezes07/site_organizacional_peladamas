@@ -14,7 +14,7 @@ beforeEach(async()=>{
 });
 afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();});
 it('starts with peladas, shows one creation step and retains edits when going back',async()=>{
-  expect(host.textContent).toContain('Suas peladas');await click('Nova pelada');
+  expect(host.textContent).toContain('Sua próxima partida começa aqui.');await click('Nova pelada');
   await input(host.querySelector('#whatslist')!,'1. Alfa\n2. Beta\n3. Gama\n4. Delta\n5. Epsilon\n6. Zeta\n7. Eta');
   await click('Revisar jogadores');
   expect(host.querySelector('#whatslist')).toBeNull();

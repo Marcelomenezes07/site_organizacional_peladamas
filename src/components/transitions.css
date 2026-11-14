@@ -1,4 +1,4 @@
-/* Transitions.dev: tabs sliding. App theme overrides live in design.css. */
+/* Transitions.dev: tabs sliding. Arena theme overrides live in arena.css. */
 :root {
   --tabs-dur: 250ms;
   --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
