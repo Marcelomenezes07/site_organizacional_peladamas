@@ -208,15 +208,10 @@ button.row:active,a.row:active{background:var(--subtle)}
 .goal-line .row-main b{display:block;font-size:15px}
 .goal-line .row-main span{color:var(--muted)}
 .goal-line button.row-main{border:0;background:none;text-align:left;padding:4px 0}
-.team-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:16px 16px 6px;display:grid;gap:6px}
-.team-card header{display:grid;gap:2px}
-.team-card h2{display:flex;align-items:center;gap:10px;font:600 20px/1.2 var(--display)}
-.team-card header p{color:var(--muted);font-size:13px;padding-left:20px}
-.team-card ol{margin:0;padding:0;list-style:none}
-.team-card li{display:flex;align-items:center;gap:12px;min-height:44px;border-top:1px solid var(--line);font-size:16px;font-weight:500}
-.team-card li:first-child{border-top:0}
-.team-card li .n{width:18px;text-align:right;color:var(--muted);font-size:13px;font-weight:500;font-variant-numeric:tabular-nums}
-.team-card li .chip{margin-left:auto}
+.team-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:14px 16px;display:grid;gap:8px}
+.team-card h2{display:flex;align-items:center;gap:8px;font:700 17px var(--font)}
+.team-card h2 small{margin-left:auto;font-weight:500;font-size:13px;color:var(--muted)}
+.team-card ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;font-size:15px}
 .teams-mini{display:grid;gap:10px;margin:0;padding:0;list-style:none}
 .teams-mini li{display:flex;gap:10px;align-items:flex-start;font-size:14px}
 .teams-mini .dot{margin-top:5px}

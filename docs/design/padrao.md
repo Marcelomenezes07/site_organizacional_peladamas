@@ -67,7 +67,6 @@ flowchart LR
 
 - **Cores fixas por posição:** Time 1 azul, Time 2 vermelho, Time 3 amarelo, Time 4 roxo, repetindo a partir do 5. A mesma cor aparece no placar, na lista de gols, nos times e na classificação (`TeamDot`).
 - **"Time de Fulano".** Na página do jogador e no texto do WhatsApp, cada time é chamado pelo jogador de referência, que é o de maior nota do time (empate: ordem alfabética), escolhido no sorteio. "Time 1" aparece em letra menor. Usa-se "de" para não supor gênero.
-- **Aba Times:** um jogador por linha, numerado, todos com o mesmo peso de letra. O jogador de referência vem primeiro, com a etiqueta "Referência". Não use duas colunas: a leitura vira zigue-zague.
 - **Notas nunca aparecem na página pública.** O servidor envia só o `leaderId` de cada time.
 
 ## 6. Relógio da partida
