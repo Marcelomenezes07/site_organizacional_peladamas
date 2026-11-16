@@ -35,7 +35,7 @@ it('names teams by their reference player and keeps navigation at the bottom',as
  expect(document.querySelector('nav[aria-label="Página da pelada"]')?.textContent).toBe('JogoTimesResumo');
  await click('Times');
  expect(document.querySelector('.team-card h2')?.textContent).toContain('Time de Jogador A');
- expect(document.querySelector('.team-card li')?.innerHTML).toBe('<b>Jogador A</b>');
+ expect(document.querySelector('.team-card li')?.textContent).toBe('1Jogador AReferência');
 });
 it('creates a match by tapping two teams and shows the organizer time',async()=>{
  await click('Nova partida');

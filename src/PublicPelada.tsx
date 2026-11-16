@@ -212,8 +212,9 @@ export default function PublicPeladaPage({number}:{number:number}){
   if(loading)body=<div className="loading" role="status"><LoaderCircle className="spin" size={28} aria-hidden="true"/>Carregando pelada…</div>;
   else if(!data)body=<div className="card empty" role="alert"><strong>Pelada não encontrada</strong><p>{error||'Confira o link com o organizador.'}</p><button type="button" className="btn subtle" onClick={()=>void refresh()}>Tentar de novo</button></div>;
   else if(!teams.length)body=<div className="card empty"><Users size={28} aria-hidden="true"/><strong>Aguardando os times</strong><p>O organizador ainda vai sortear os times. Esta página se atualiza sozinha.</p></div>;
-  else if(tab==='times')body=teams.map((t,i)=><article key={t.id} className="team-card"><h2><TeamDot index={i%4}/>{label(t.id)}<small>{label(t.id)!==t.name?`${t.name} · `:''}{t.playerIds.length} jogadores</small></h2>
-    <ul>{members(t.id).map(p=><li key={p.id}>{p.id===t.leaderId?<b>{p.name}</b>:p.name}</li>)}</ul></article>);
+  else if(tab==='times')body=teams.map((t,i)=><article key={t.id} className="team-card" aria-labelledby={`team-${t.id}`}>
+    <header><h2 id={`team-${t.id}`}><TeamDot index={i%4}/>{label(t.id)}</h2><p>{label(t.id)!==t.name?`${t.name} · `:''}{t.playerIds.length} jogadores</p></header>
+    <ol>{members(t.id).map((p,n)=><li key={p.id}><span className="n" aria-hidden="true">{n+1}</span>{p.name}{p.id===t.leaderId&&<span className="chip">Referência</span>}</li>)}</ol></article>);
   else if(tab==='resumo'){
     const summary=summarize(data,players),played=summary.table.some(t=>t.played),first=summary.table[0];
     const leaders=played?summary.table.filter(t=>t.points===first.points&&t.balance===first.balance&&t.goalsFor===first.goalsFor):[];
