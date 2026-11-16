@@ -7,7 +7,10 @@ export type Player = {
   assists?:number;
 };
 export type Ranking = { players: Player[]; etag: string | null };
-export type Pelada = { number: number; createdAt: string; date?: string; players: Player[]; etag: string | null };
+export type Pelada = { number: number; createdAt: string; date?: string; players: Player[]; etag: string | null;
+  /** Minutos de cada partida; ausente em peladas antigas. */ duration?: number;
+  /** Times publicados (existe arquivo de partidas). */ teamsPublished?: boolean;
+  /** Partidas registradas; ausente em peladas antigas. */ matchCount?: number };
 export type AppState = { ranking: Ranking; peladas: Pelada[]; nextPeladaNumber?:number;pendingDeletions?:number[] };
 
 // Jogadores fictícios para demonstração. Dados reais ficam somente no armazenamento privado.

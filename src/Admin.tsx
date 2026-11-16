@@ -31,14 +31,14 @@ export default function Admin(){
     if(!r.ok)throw new Error('Não foi possível sair. Tente novamente.');
     setSession(false);setPassword('');setError('');
   }
-  if(session===null)return <main className="login-shell"><p role="status">Carregando…</p></main>;
+  if(session===null)return <main className="login"><p role="status" className="muted">Carregando…</p></main>;
   if(session)return <App onLogout={logout}/>;
-  return <main className="login-shell"><form className="panel login-card" onSubmit={login}>
-    <div className="footer-mark"><span aria-hidden="true">⚽</span> <strong>PELA<span>DAMAS</span></strong></div>
-    <h1>Área do<br/>administrador<span className="heading-dot">.</span></h1><p className="login-description">Acesse o ranking e a organização dos times.</p>
-    <label htmlFor="username">Usuário</label><input id="username" autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} required maxLength={80} autoCapitalize="none" spellCheck={false}/>
-    <label htmlFor="password">Senha</label><input id="password" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required maxLength={200}/>
+  return <main className="login"><form onSubmit={login}>
+    <div className="brand" aria-hidden="true">⚽ PELA<span>DAMAS</span></div>
+    <h1>Área do organizador</h1><p>Crie peladas, sorteie os times e mantenha o ranking.</p>
+    <div className="field"><label htmlFor="username">Usuário</label><input id="username" autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} required maxLength={80} autoCapitalize="none" spellCheck={false}/></div>
+    <div className="field"><label htmlFor="password">Senha</label><input id="password" type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required maxLength={200}/></div>
     {error&&<p className="error-text" role="alert">{error}</p>}
-    <button className="button primary full" disabled={busy} type="submit">{busy?'Entrando…':'Entrar'}<ArrowRight size={18} aria-hidden="true"/></button>
+    <button className="btn primary block" disabled={busy} type="submit">{busy?'Entrando…':'Entrar'}<ArrowRight size={18} aria-hidden="true"/></button>
   </form></main>;
 }

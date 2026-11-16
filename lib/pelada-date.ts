@@ -11,3 +11,11 @@ export function todayLocal(){
 export function formatPeladaDate(value?:string){
   return validPeladaDate(value)?value.split('-').reverse().join('/'):'';
 }
+const weekdays=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const months=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+/** "Sáb, 15 nov" — calculado sem fuso horário. */
+export function formatPeladaDay(value?:string){
+  if(!validPeladaDate(value))return '';
+  const [y,m,d]=value.split('-').map(Number);
+  return `${weekdays[new Date(Date.UTC(y,m-1,d)).getUTCDay()]}, ${d} ${months[m-1]}`;
+}

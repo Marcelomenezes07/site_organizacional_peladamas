@@ -3,132 +3,123 @@ import {act} from 'react';
 import {createRoot,type Root} from 'react-dom/client';
 import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import PublicPeladaPage from '../src/PublicPelada';
-import type {PublicPelada} from '../lib/matches';
+import type {PublicPelada,Match} from '../lib/matches';
 const api=vi.hoisted(()=>({getPelada:vi.fn(),changePelada:vi.fn()}));
 vi.mock('../src/pelada-api',()=>({...api,PeladaError:class extends Error{status=500;}}));
-let host:HTMLDivElement,root:Root,game:PublicPelada;
-const click=async(label:string,scope:ParentNode=document)=>{
- const b=Array.from(scope.querySelectorAll('button')).find(b=>b.textContent?.trim()===label)!;
- expect(b).toBeTruthy();await act(async()=>b.click());
-};
+let host:HTMLDivElement,root:Root,game:PublicPelada,version=1;
+const button=(label:string,scope:ParentNode=document)=>Array.from(scope.querySelectorAll('button')).find(b=>b.getAttribute('aria-label')===label||b.textContent?.trim()===label);
+const click=async(label:string,scope:ParentNode=document)=>{const b=button(label,scope);expect(b,label).toBeTruthy();await act(async()=>b!.click());};
+const dialog=()=>document.querySelector<HTMLElement>('[role="dialog"]')!;
+const bump=()=>{game.etag=`version-${++version}`;};
+const startMatch=async()=>{await click('Nova partida');await click('Time de Jogador A',dialog());await click('Time de Jogador C',dialog());await click('Começar partida',dialog());};
 beforeEach(async()=>{
- Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
- game={number:1,createdAt:'2026-11-05',etag:'version-1',players:[{id:'a',name:'Jogador A',goals:0,assists:0},{id:'b',name:'Jogador B',goals:0,assists:0},{id:'c',name:'Jogador C',goals:0,assists:0}],teams:[{id:'time-1',name:'Time 1',playerIds:['a']},{id:'time-2',name:'Time 2',playerIds:['b']},{id:'time-3',name:'Time 3',playerIds:['c']}],matches:[]};
+ Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});vi.stubGlobal('scrollTo',()=>{});version=1;
+ game={number:1,createdAt:'2026-11-05',date:'2026-11-14',duration:8,serverNow:Date.now(),etag:'version-1',
+  players:['A','B','C','D'].map(n=>({id:n.toLowerCase(),name:`Jogador ${n}`,goals:0,assists:0})),
+  teams:[{id:'time-1',name:'Time 1',playerIds:['b','a'],leaderId:'a'},{id:'time-2',name:'Time 2',playerIds:['c'],leaderId:'c'},{id:'time-3',name:'Time 3',playerIds:['d'],leaderId:'d'}],matches:[]};
  vi.clearAllMocks();api.getPelada.mockImplementation(async()=>structuredClone(game));
- api.changePelada.mockImplementation(async(_n,body)=>{game.matches=game.matches.some(m=>m.id===body.match.id)?game.matches.map(m=>m.id===body.match.id?structuredClone(body.match):m):[...game.matches,structuredClone(body.match)];game.etag='version-2';});
+ api.changePelada.mockImplementation(async(_n:number,body:{action:string;etag?:string;match?:Match;matchId?:string;op?:string;password?:string})=>{
+  if(body.action==='clock'){game.matches=game.matches.map(m=>m.id===body.matchId?{...m,clock:{startedAt:body.op==='start'?Date.now():null,elapsed:0}}:m);bump();return;}
+  if(body.etag!==game.etag)throw new Error('Esse registro mudou desde que você abriu.');
+  if(body.action==='deleteMatch'){if(body.password!=='segredo')throw new Error('Senha da pelada incorreta.');game.matches=game.matches.filter(m=>m.id!==body.matchId);bump();return;}
+  const m=structuredClone(body.match!);const old=game.matches.find(x=>x.id===m.id);if(old?.clock)m.clock=old.clock;
+  game.matches=old?game.matches.map(x=>x.id===m.id?m:x):[...game.matches,m];bump();
+ });
  host=document.createElement('div');document.body.append(host);root=createRoot(host);
  await act(async()=>root.render(<PublicPeladaPage number={1}/>));
 });
-afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
-it('creates a live match using only two team choices; keeps Edit without a status field',async()=>{
- await click('Criar partida');
- let editor=document.querySelector('.match-editor')!;
- expect(editor.querySelectorAll('select')).toHaveLength(2);
- expect(editor.querySelectorAll('input')).toHaveLength(0);
- expect(editor.textContent).not.toContain('Situação');
- await click('Criar partida',editor);
- expect(api.changePelada).toHaveBeenCalledWith(1,expect.objectContaining({action:'saveMatch',etag:'version-1',match:expect.objectContaining({homeId:'time-1',awayId:'time-2',status:'finished',homeScore:0,awayScore:0,goals:[]})}));
- expect(document.querySelector('.match-editor')).toBeNull();
- expect(document.querySelector('.match-card')?.textContent).toContain('0 × 0');
+afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();});
+
+it('names teams by their reference player and keeps navigation at the bottom',async()=>{
+ expect(document.querySelector('h1')?.textContent).toBe('Sáb, 14 nov');
+ expect(document.querySelector('nav[aria-label="Página da pelada"]')?.textContent).toBe('JogoTimesResumo');
+ await click('Times');
+ expect(document.querySelector('.team-card h2')?.textContent).toContain('Time de Jogador A');
+ expect(document.querySelector('.team-card li')?.innerHTML).toBe('<b>Jogador A</b>');
+});
+it('creates a match by tapping two teams and shows the organizer time',async()=>{
+ await click('Nova partida');
+ expect(dialog().textContent).toContain('8 min');
+ expect(button('Começar partida',dialog())?.disabled).toBe(true);
+ await click('Time de Jogador A',dialog());await click('Time de Jogador C',dialog());await click('Começar partida',dialog());
+ expect(game.matches[0]).toMatchObject({homeId:'time-1',awayId:'time-2',status:'finished',homeScore:0,awayScore:0,goals:[]});
+ expect(document.querySelector('.match-card')?.textContent).toContain('Partida 1 · agora');
+ expect(document.querySelector('[role="timer"] .clock-time')?.textContent).toBe('08:00');
+});
+it('records a goal in three taps: goal, scorer, assist',async()=>{
+ await startMatch();
+ await click('Gol para Time de Jogador A');
+ expect(dialog().querySelectorAll('select')).toHaveLength(0);
+ await click('Jogador A',dialog());await click('Jogador B',dialog());
+ expect(game.matches[0]).toMatchObject({homeScore:1,goals:[{teamId:'time-1',scorerId:'a',assistId:'b',ownGoal:false}]});
+ expect(document.querySelector('[role="dialog"]')).toBeNull();
+ expect(document.querySelector('[role="status"]')?.textContent).toContain('Gol de Jogador A · assistência de Jogador B');
+});
+it('saves a goal after a clock-only change without bothering the user',async()=>{
+ await startMatch();
+ await click('Gol para Time de Jogador C');
+ game.matches[0].clock={startedAt:Date.now(),elapsed:0};bump();
+ await click('Jogador C',dialog());await click('Sem assistência',dialog());
+ expect(game.matches[0]).toMatchObject({awayScore:1,goals:[{scorerId:'c',assistId:null}]});
+ expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+it('warns when someone else changed the score and saves only on request',async()=>{
+ await startMatch();
+ await click('Gol para Time de Jogador A');
+ game.matches[0]={...game.matches[0],homeScore:1,goals:[{teamId:'time-1',scorerId:'b',assistId:null,ownGoal:false}]};bump();
+ await click('Jogador A',dialog());await click('Sem assistência',dialog());
+ expect(dialog().textContent).toContain('O placar mudou em outro celular');
+ expect(game.matches[0].goals).toHaveLength(1);
+ await click('Salvar mesmo assim',dialog());
+ expect(game.matches[0]).toMatchObject({homeScore:2});expect(game.matches[0].goals.map(g=>g.scorerId)).toEqual(['b','a']);
+});
+it('starts the shared clock',async()=>{
+ await startMatch();
+ await click('Iniciar');
+ expect(api.changePelada).toHaveBeenLastCalledWith(1,{action:'clock',matchId:game.matches[0].id,op:'start'});
+ expect(button('Pausar')).toBeTruthy();
+});
+it('edits a match on its own screen and asks before discarding changes',async()=>{
+ await startMatch();await click('Gol para Time de Jogador A');await click('Jogador A',dialog());await click('Sem assistência',dialog());
  await click('Editar');
- editor=document.querySelector('.match-editor')!;
- expect(editor.querySelector('.live-score')).not.toBeNull();
- expect(editor.textContent).not.toContain('Situação');
- await click('Salvar partida',editor);
- expect(api.changePelada).toHaveBeenLastCalledWith(1,expect.objectContaining({etag:'version-2',match:expect.objectContaining({status:'finished',homeScore:0,awayScore:0})}));
- expect(game.matches).toHaveLength(1);
+ expect(document.querySelector('nav[aria-label="Página da pelada"]')).toBeNull();
+ await click('Remover gol 1');
+ await click('Voltar');expect(dialog().textContent).toContain('Descartar');
+ await click('Cancelar',dialog());
+ await click('Salvar partida');
+ expect(game.matches[0]).toMatchObject({homeScore:0,goals:[]});
+ expect(document.querySelector('.match-card')).not.toBeNull();
 });
-it('prevents selecting the same team twice and cancels creation without saving',async()=>{
- await click('Criar partida');
- const selects=document.querySelectorAll<HTMLSelectElement>('.match-editor select');
- expect(selects[0].querySelector<HTMLOptionElement>('option[value="time-2"]')?.disabled).toBe(true);
- expect(selects[1].querySelector<HTMLOptionElement>('option[value="time-1"]')?.disabled).toBe(true);
- await click('Cancelar',document.querySelector('.match-editor')!);await click('Confirmar');
- expect(api.changePelada).not.toHaveBeenCalled();expect(document.querySelector('.match-editor')).toBeNull();
+it('changes the scorer of a goal inside the editor',async()=>{
+ await startMatch();await click('Gol para Time de Jogador A');await click('Jogador A',dialog());await click('Sem assistência',dialog());
+ await click('Editar');await click('Alterar gol 1');await click('Jogador B',dialog());await click('Jogador A',dialog());
+ await click('Salvar partida');
+ expect(game.matches[0].goals).toEqual([{teamId:'time-1',scorerId:'b',assistId:'a',ownGoal:false}]);
 });
-
-it('adds a goal from the match card, saves its scorer, and corrects it through Edit',async()=>{
- await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);
- await click('+ Gol · Time 1',document.querySelector('.match-card')!);
- expect(document.querySelector('.match-editor')).toBeNull();
- let editor=document.querySelector('.quick-goal')!;
- expect(editor.querySelectorAll('select')).toHaveLength(2);
- const scorer=editor.querySelector<HTMLSelectElement>('select')!;
- expect(scorer).not.toBeNull();
- await act(async()=>{scorer.value='a';scorer.dispatchEvent(new Event('change',{bubbles:true}));});
- await click('Salvar gol',editor);
- expect(game.matches[0].homeScore).toBe(1);expect(game.matches[0].goals[0].scorerId).toBe('a');
- await click('Editar');editor=document.querySelector('.match-editor')!;
- await act(async()=>editor.querySelector<HTMLButtonElement>('[aria-label="Remover gol 1"]')!.click());await click('Salvar partida',editor);
- expect(game.matches[0].homeScore).toBe(0);expect(game.matches[0].goals).toEqual([]);
- expect(game.matches).toHaveLength(1);
+it('deletes a match only with the pelada password',async()=>{
+ await startMatch();await click('Editar');await act(async()=>Array.from(document.querySelectorAll('button')).find(b=>b.textContent?.startsWith('Excluir partida'))!.click());
+ const field=document.querySelector<HTMLInputElement>('#delete-match-password')!;
+ const type=async(v:string)=>act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(field,v);field.dispatchEvent(new Event('input',{bubbles:true}));});
+ await type('errada');await act(async()=>field.form!.requestSubmit());
+ expect(dialog().textContent).toContain('Senha da pelada incorreta');expect(game.matches).toHaveLength(1);
+ await type('segredo');await act(async()=>field.form!.requestSubmit());
+ expect(game.matches).toHaveLength(0);
 });
-
-it('cancels a quick goal without changing the score or sending a write',async()=>{
- await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);
- const writes=api.changePelada.mock.calls.length;
- await click('+ Gol · Time 1',document.querySelector('.match-card')!);
- await click('Cancelar',document.querySelector('.quick-goal')!);
- expect(api.changePelada.mock.calls).toHaveLength(writes);expect(game.matches[0].homeScore).toBe(0);
- expect(document.querySelector('.quick-goal')).toBeNull();
+it('lists previous matches below the current one',async()=>{
+ await startMatch();await startMatch();
+ expect(document.querySelector('.match-card')?.textContent).toContain('Partida 2 · agora');
+ expect(document.querySelector('.match-history')?.textContent).toContain('Partida 1');
 });
-it('keeps a failed quick goal visible and blocks a stale update instead of overwriting another score',async()=>{
- await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);
- await click('+ Gol · Time 1',document.querySelector('.match-card')!);
- const scorer=document.querySelector<HTMLSelectElement>('.quick-goal select')!;
- await act(async()=>{scorer.value='a';scorer.dispatchEvent(new Event('change',{bubbles:true}));});
- api.changePelada.mockImplementationOnce(async()=>{game.etag='version-3';throw new Error('Outro jogador atualizou o placar.');});
- await click('Salvar gol',document.querySelector('.quick-goal')!);
- expect(document.querySelector('.quick-goal')?.textContent).toContain('Outro jogador');
- const save=Array.from(document.querySelectorAll<HTMLButtonElement>('.quick-goal button')).find(b=>b.textContent==='Salvar gol')!;
- expect(save.disabled).toBe(true);expect(game.matches[0].homeScore).toBe(0);
-});
-
-it('asks before changing a team with goals and preserves events when canceled',async()=>{
- await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);
- await click('+ Gol · Time 1',document.querySelector('.match-card')!);
- const scorer=document.querySelector<HTMLSelectElement>('.quick-goal select')!;
- await act(async()=>{scorer.value='a';scorer.dispatchEvent(new Event('change',{bubbles:true}));});
- await click('Salvar gol',document.querySelector('.quick-goal')!);await click('Editar');
- const home=document.querySelector<HTMLSelectElement>('.match-editor select')!;
- await act(async()=>{home.value='time-3';home.dispatchEvent(new Event('change',{bubbles:true}));});
- expect(document.querySelector('[role="dialog"]')?.textContent).toContain('remover os gols');
- await click('Cancelar',document.querySelector('[role="dialog"]')!);
- expect(document.querySelectorAll('.goal-entry')).toHaveLength(1);
- await click('Salvar partida',document.querySelector('.match-editor')!);
- expect(game.matches[0].homeId).toBe('time-1');expect(game.matches[0].homeScore).toBe(1);
-});
-it('keeps previous games in a collapsed section of this same pelada',async()=>{
- for(let i=0;i<2;i++){await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);}
- const history=document.querySelector<HTMLDetailsElement>('.match-history')!;
- expect(history.open).toBe(false);expect(history.textContent).toContain('Outros jogos desta pelada');
- expect(document.querySelector('.featured')?.textContent).toContain('Partida 2');
- expect(history.querySelector('.match-card')?.textContent).toContain('Partida 1');
-});
-
-it('opens and saves a match when randomUUID is unavailable on local HTTP',async()=>{
- const original=Object.getOwnPropertyDescriptor(crypto,'randomUUID');
- Object.defineProperty(crypto,'randomUUID',{configurable:true,value:undefined});
- try{
-  await click('Criar partida');
-  const editor=document.querySelector('.match-editor')!;
-  expect(editor).not.toBeNull();expect(document.activeElement).toBe(document.querySelector('.ds-screen-header h2'));
-  await click('Criar partida',editor);
-  expect(game.matches).toHaveLength(1);
-  expect(game.matches[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
- }finally{if(original)Object.defineProperty(crypto,'randomUUID',original);else delete (crypto as Partial<Crypto>).randomUUID;}
-});
-it('shows small empty-state messages instead of leader names before any goals',async()=>{
+it('shows small empty states in the summary before any goal',async()=>{
  await click('Resumo');
  expect(document.querySelectorAll('.summary-empty')).toHaveLength(3);
  expect(document.querySelectorAll('.leader-name')).toHaveLength(0);
 });
-it('uses a dedicated editing screen and returns without changing the match',async()=>{
- await click('Criar partida');await click('Criar partida',document.querySelector('.match-editor')!);await click('Editar');
- expect(document.querySelector('.ds-editor-page')).not.toBeNull();
- expect(document.querySelector('.match-list')).toBeNull();
- expect(document.querySelector('[aria-label="Página da pelada"]')).toBeNull();
- await click('Voltar');await click('Confirmar');
- expect(document.querySelector('.ds-editor-page')).toBeNull();expect(game.matches).toHaveLength(1);
- expect(document.querySelector('.match-card')).not.toBeNull();
+it('creates a match when randomUUID is unavailable on local HTTP',async()=>{
+ const original=Object.getOwnPropertyDescriptor(crypto,'randomUUID');
+ Object.defineProperty(crypto,'randomUUID',{configurable:true,value:undefined});
+ try{
+  await startMatch();
+  expect(game.matches[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+ }finally{if(original)Object.defineProperty(crypto,'randomUUID',original);else delete (crypto as Partial<Crypto>).randomUUID;}
 });

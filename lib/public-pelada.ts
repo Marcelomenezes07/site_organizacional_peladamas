@@ -2,7 +2,7 @@ import {validPeladaPassword} from './pelada-password.js';
 import {randomUUID} from 'node:crypto';
 import {readDocument,createDocument,updateDocument,deleteDocument,ConflictError} from './storage.js';
 import {readCsv,peladaToCsv} from './csv.js';
-import {summarize,validateMatch,type MatchState,type SavedTeam} from './matches.js';
+import {summarize,validateMatch,teamLeader,changeClock,DEFAULT_MATCH_MINUTES,type MatchState,type SavedTeam} from './matches.js';
 
 export async function readMatchState(number:number,matchFile?:string):Promise<MatchState>{
   if(!matchFile)return {teams:[],matches:[]};
@@ -19,30 +19,42 @@ export async function handlePublicPelada(method:string,number:number,payload:unk
     const parsed=readCsv(doc.content),state=await readMatchState(number,parsed.matchFile);
     if(method==='GET'){
       const {totals}=summarize(state,parsed.players);
-      return reply(200,{pelada:{number,createdAt:parsed.createdAt,date:parsed.date,etag:doc.etag,...state,players:totals.map(({id,name,goals,assists})=>({id,name,goals,assists}))}});
+      // Notas nunca saem daqui: só o id do jogador de referência de cada time.
+      const teams=state.teams.map(t=>({...t,leaderId:t.leaderId??teamLeader(t.playerIds,parsed.players)}));
+      return reply(200,{pelada:{number,createdAt:parsed.createdAt,date:parsed.date,duration:parsed.duration??DEFAULT_MATCH_MINUTES,serverNow:Date.now(),etag:doc.etag,...state,teams,players:totals.map(({id,name,goals,assists})=>({id,name,goals,assists}))}});
     }
     if(method!=='POST')return reply(405,{error:'Método não permitido.'});
     if(!payload||typeof payload!=='object')return reply(400,{error:'Solicitação inválida.'});
     const data=payload as Record<string,unknown>;
-    if(!['publishTeams','saveMatch','deleteMatch'].includes(String(data.action)))return reply(400,{error:'Ação não permitida nesta página.'});
+    if(!['publishTeams','saveMatch','deleteMatch','clock'].includes(String(data.action)))return reply(400,{error:'Ação não permitida nesta página.'});
     if(data.action==='publishTeams'&&!admin)return reply(401,{error:'Somente o administrador pode salvar os times.'});
-    if(data.etag!==doc.etag)throw new ConflictError();
+    // O relógio é aplicado sobre a versão mais recente; não exige a versão que o celular tinha.
+    if(data.action!=='clock'&&data.etag!==doc.etag)throw new ConflictError();
     let next:MatchState;
     if(data.action==='publishTeams'){
       if(state.matches.length)return reply(409,{error:'Os times não podem mudar depois de registrar partidas.'});
       if(!Array.isArray(data.teams)||data.teams.length<2||data.teams.length>60)return reply(400,{error:'Times inválidos.'});
       const ids=data.teams.flat();
       if(data.teams.some(t=>!Array.isArray(t)||!t.length)||ids.length!==parsed.players.length||new Set(ids).size!==ids.length||ids.some(id=>!parsed.players.some(p=>p.id===id)))return reply(400,{error:'Distribua todos os convocados uma única vez.'});
-      const teams:SavedTeam[]=data.teams.map((playerIds,i)=>({id:`time-${i+1}`,name:`Time ${i+1}`,playerIds}));
+      const teams:SavedTeam[]=data.teams.map((playerIds:string[],i)=>({id:`time-${i+1}`,name:`Time ${i+1}`,playerIds,leaderId:teamLeader(playerIds,parsed.players)}));
       next={teams,matches:[]};
     }else if(data.action==='deleteMatch'){
       if(!await validPeladaPassword(number,data.password))return reply(403,{error:'Senha da pelada incorreta. Peça a senha ao organizador.'});
       if(typeof data.matchId!=='string'||!state.matches.some(m=>m.id===data.matchId))return reply(404,{error:'Partida não encontrada.'});
       next={teams:state.teams,matches:state.matches.filter(m=>m.id!==data.matchId)};
+    }else if(data.action==='clock'){
+      const op=data.op;
+      if(op!=='start'&&op!=='pause'&&op!=='reset')return reply(400,{error:'Ação do relógio inválida.'});
+      const current=state.matches.find(m=>m.id===data.matchId);
+      if(!current)return reply(404,{error:'Partida não encontrada.'});
+      next={teams:state.teams,matches:state.matches.map(m=>m===current?{...m,clock:changeClock(m.clock,op,Date.now())}:m)};
     }else{
       if(!state.teams.length)return reply(409,{error:'Aguarde o administrador salvar os times.'});
-      const match=validateMatch(data.match,state.teams);
-      const exists=state.matches.some(m=>m.id===match.id);
+      const validated=validateMatch(data.match,state.teams);
+      const previous=state.matches.find(m=>m.id===validated.id);
+      // O relógio só muda pela ação "clock"; uma edição de placar mantém o relógio salvo.
+      const match=previous?.clock?{...validated,clock:previous.clock}:validated;
+      const exists=Boolean(previous);
       if(!exists&&state.matches.length>=300)return reply(400,{error:'Limite de 300 partidas por pelada.'});
       next={teams:state.teams,matches:exists?state.matches.map(m=>m.id===match.id?match:m):[...state.matches,match]};
     }
@@ -51,7 +63,7 @@ export async function handlePublicPelada(method:string,number:number,payload:unk
     // Immutable snapshot first; the CSV pointer and totals commit atomically with its ETag.
     const matchFile=`partidas/pelada_${number}_${randomUUID()}.json`;
     await createDocument(matchFile,JSON.stringify(next));
-    try{await updateDocument(path,peladaToCsv({...parsed,players,matchFile}),doc.etag);}
+    try{await updateDocument(path,peladaToCsv({...parsed,players,matchFile,matchCount:next.matches.length}),doc.etag);}
     catch(e){try{await deleteDocument(matchFile);}catch(cleanup){console.error('Revisão não publicada pendente de limpeza',cleanup);}throw e;}
     return reply(200,{ok:true});
   }catch(e){

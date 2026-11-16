@@ -1,6 +1,7 @@
 import {getOrCreatePeladaPassword,passwordPath} from './pelada-password.js';
 import {validPeladaDate} from './pelada-date.js';
 import {readMatchState} from './public-pelada.js';
+import {validDuration} from './matches.js';
 import { readCsv, rankingToCsv, peladaToCsv } from './csv.js';
 import { starterPlayers, type AppState, type Pelada, type Player, type Ranking } from './models.js';
 import { validStars, normalize, matchPlayer } from './logic.js';
@@ -36,6 +37,7 @@ async function peladas(pathsOverride?:string[], pending:number[]=[]):Promise<Pel
     const doc=await readDocument(path);if(!doc)return null;if(doc.content===deletedMarker){pending.push(Number(path.match(/pelada_(\d+)/)![1]));return null;}
     const parsed=readCsv(doc.content);
     return {number:Number(path.match(/pelada_(\d+)\.csv$/)?.[1]),createdAt:parsed.createdAt,date:parsed.date,
+      duration:parsed.duration,teamsPublished:Boolean(parsed.matchFile),matchCount:parsed.matchCount,
       players:checkPlayers(parsed.players,120).map(p=>({...p,goals:parsed.players.find(x=>x.id===p.id)?.goals??0,assists:parsed.players.find(x=>x.id===p.id)?.assists??0})),etag:doc.etag};
   }));
   return docs.filter(x=>x!==null).sort((a,b)=>b.number-a.number);
@@ -121,12 +123,24 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
       const matchState=await readMatchState(number,parsed.matchFile);
       if(matchState.teams.length&&(players.length!==parsed.players.length||players.some(p=>!parsed.players.some(x=>x.id===p.id))))return output(400,{error:'Os convocados não podem mudar depois de salvar os times. Você ainda pode corrigir nomes e estrelas.'});
       const preserved=players.map(p=>({...p,goals:parsed.players.find(x=>x.id===p.id)?.goals??0,assists:parsed.players.find(x=>x.id===p.id)?.assists??0}));
-      await updateDocument(path,peladaToCsv({players:preserved,createdAt:parsed.createdAt||new Date().toISOString(),matchFile:parsed.matchFile,date:parsed.date}),doc.etag);
+      await updateDocument(path,peladaToCsv({...parsed,players:preserved,createdAt:parsed.createdAt||new Date().toISOString()}),doc.etag);
+      return output(200,{ok:true});
+    }
+    if(data.action==='setPeladaDuration'){
+      const number=Number(data.number);
+      if(!Number.isSafeInteger(number)||number<1)return output(400,{error:'Pelada inválida.'});
+      if(!validDuration(data.duration))return output(400,{error:'Informe um tempo de partida entre 1 e 90 minutos.'});
+      const path=peladaPath(number),doc=await readDocument(path);
+      if(!doc||doc.content===deletedMarker)return output(404,{error:'Pelada não encontrada.'});
+      if(typeof data.etag!=='string'||doc.etag!==data.etag)throw new ConflictError();
+      await updateDocument(path,peladaToCsv({...readCsv(doc.content),duration:data.duration}),doc.etag);
       return output(200,{ok:true});
     }
     if(data.action==='createPelada'){
       if(data.date!==undefined&&!validPeladaDate(data.date))return output(400,{error:'Informe uma data válida para a pelada.'});
       const date=data.date as string|undefined;
+      if(data.duration!==undefined&&!validDuration(data.duration))return output(400,{error:'Informe um tempo de partida entre 1 e 90 minutos.'});
+      const duration=data.duration as number|undefined;
       const players=checkPlayers(data.players,120);
       if(players.length<4)throw new Error('A pelada precisa de pelo menos 4 jogadores.');
       const addIds=data.addToRankingIds??[];
@@ -135,7 +149,7 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
         const ids=await usedPeladaNumbers();
         const number=Math.max(0,...ids)+1;
         try{
-          await createDocument(peladaPath(number),peladaToCsv({players,createdAt:new Date().toISOString(),date}));
+          await createDocument(peladaPath(number),peladaToCsv({players,createdAt:new Date().toISOString(),date,duration}));
           // The game is already saved. Report a partial failure without inviting a duplicate game.
           let addedToRanking=0;
           try{addedToRanking=await addToRanking(players.filter(p=>addIds.includes(p.id)));}

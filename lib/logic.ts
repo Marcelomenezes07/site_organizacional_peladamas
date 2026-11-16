@@ -10,7 +10,7 @@ export function parseWhatsAppList(input: string): string[] {
   for (const raw of input.split(/\r?\n/)) {
     let s=raw.trim();
     if (/^\s*(espera|lista de espera|reservas|suplentes)\s*:/i.test(s)) break;
-    if (!s || /^(pix|valor|r\$|quadra|data|hora|local|pelada|total|confirmados|pagos)\b/i.test(s)) continue;
+    if (!s || /^(pix|valor|r\$|quadra|data|hora|local|pelada(?:mas|s)?|total|confirmados|pagos)\b/i.test(s)) continue;
     // Descarta prefácio textual de WhatsApp; aceita itens numerados ou linhas de nomes puros.
     s=s.replace(/^\s*(?:\d{1,3}\s*[.)\-:]\s*|[•*-]\s*)/,'');
     s=s.replace(/[✅✔☑☒⚽⭐🌟🔥💪❌✖]+/gu,'').trim();

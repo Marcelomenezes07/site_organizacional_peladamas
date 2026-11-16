@@ -37,7 +37,7 @@ export function useConfirmation(){
     <div ref={dialog} role="dialog" aria-modal="true" className="confirmation-dialog" aria-labelledby={id+'-title'} aria-describedby={id+'-message'}>
       <h2 id={id+'-title'}>Confirmar ação</h2>
       <p id={id+'-message'}>{message}</p>
-      <div className="button-row"><button type="button" className="button subtle" onClick={()=>finish(false)}>Cancelar</button><button type="button" className="button primary" onClick={()=>finish(true)}>Confirmar</button></div>
+      <div className="pair"><button type="button" className="btn subtle" onClick={()=>finish(false)}>Cancelar</button><button type="button" className="btn primary" onClick={()=>finish(true)}>Confirmar</button></div>
     </div>
   </div>,document.body);
   return {confirm,confirmation};

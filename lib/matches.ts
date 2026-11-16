@@ -1,9 +1,27 @@
 export type PublicPlayer={id:string;name:string;goals:number;assists:number};
-export type SavedTeam={id:string;name:string;playerIds:string[]};
+/** leaderId: jogador de referência (maior nota), exibido como "Time do Fulano" sem revelar notas. */
+export type SavedTeam={id:string;name:string;playerIds:string[];leaderId?:string};
 export type Goal={teamId:string;scorerId:string|null;assistId:string|null;ownGoal:boolean};
-export type Match={id:string;homeId:string;awayId:string;status:'scheduled'|'finished';homeScore:number;awayScore:number;goals:Goal[]};
+/** Relógio compartilhado: startedAt (ms, hora do servidor) quando rodando; elapsed acumulado nas pausas. */
+export type MatchClock={startedAt:number|null;elapsed:number};
+export type Match={id:string;homeId:string;awayId:string;status:'scheduled'|'finished';homeScore:number;awayScore:number;goals:Goal[];clock?:MatchClock};
 export type MatchState={teams:SavedTeam[];matches:Match[]};
-export type PublicPelada=MatchState&{number:number;createdAt:string;date?:string;players:PublicPlayer[];etag:string};
+export type PublicPelada=MatchState&{number:number;createdAt:string;date?:string;players:PublicPlayer[];etag:string;duration?:number;serverNow?:number};
+export const DEFAULT_MATCH_MINUTES=10;
+export const validDuration=(value:unknown):value is number=>Number.isInteger(value)&&(value as number)>=1&&(value as number)<=90;
+export function teamLeader(playerIds:string[],players:{id:string;name:string;stars:number}[]):string|undefined{
+  return players.filter(p=>playerIds.includes(p.id)).sort((a,b)=>b.stars-a.stars||a.name.localeCompare(b.name,'pt-BR'))[0]?.id;
+}
+export function clockElapsed(clock:MatchClock|undefined,now:number){
+  if(!clock)return 0;
+  return clock.elapsed+(clock.startedAt===null?0:Math.max(0,now-clock.startedAt));
+}
+export function changeClock(clock:MatchClock|undefined,op:'start'|'pause'|'reset',now:number):MatchClock{
+  const current=clock??{startedAt:null,elapsed:0};
+  if(op==='reset')return {startedAt:null,elapsed:0};
+  if(op==='start')return current.startedAt===null?{startedAt:now,elapsed:current.elapsed}:current;
+  return current.startedAt===null?current:{startedAt:null,elapsed:clockElapsed(current,now)};
+}
 export function summarize(state:MatchState,players:Pick<PublicPlayer,'id'|'name'>[]){
   const totals=players.map(p=>({...p,goals:0,assists:0}));
   const table=state.teams.map(t=>({...t,played:0,wins:0,draws:0,losses:0,goalsFor:0,goalsAgainst:0,balance:0,points:0}));
@@ -36,4 +54,10 @@ export function validateMatch(value:unknown,teams:SavedTeam[]):Match{
     return {teamId:g.teamId,scorerId:g.scorerId,assistId:g.assistId,ownGoal:g.ownGoal};
   });
   return {id:m.id,homeId:home.id,awayId:away.id,status:m.status,homeScore:m.homeScore,awayScore:m.awayScore,goals};
+}
+/** Nome que o jogador reconhece na quadra: "Time de Fulano" (jogador de referência), ou "Time N" sem referência. */
+export function teamLabel(team:Pick<SavedTeam,'name'|'leaderId'>|undefined,players:{id:string;name:string}[]){
+  if(!team)return 'Time';
+  const leader=players.find(p=>p.id===team.leaderId);
+  return leader?`Time de ${leader.name}`:team.name;
 }

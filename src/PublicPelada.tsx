@@ -1,14 +1,14 @@
-import ScreenHeader from './components/ScreenHeader';
-import JourneyNav from './components/JourneyNav';
-import './components/transitions.css';
-import {formatPeladaDate} from '../lib/pelada-date';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {CircleDot,RefreshCw,Plus,Pencil,ChevronDown,Users,Trophy,Target,Handshake,Check,Clock3,Info,Trash2} from 'lucide-react';
-import {summarize,type PublicPelada,type Match,type Goal} from '../lib/matches';
+import {ArrowLeftRight,ChevronRight,CircleDot,LoaderCircle,Pencil,Plus,Trash2,TriangleAlert,Trophy,Users} from 'lucide-react';
+import {changeClock,summarize,teamLabel,DEFAULT_MATCH_MINUTES,type Goal,type Match,type PublicPelada} from '../lib/matches';
+import {formatPeladaDay} from '../lib/pelada-date';
 import {getPelada,changePelada,PeladaError} from './pelada-api';
 import {useConfirmation} from './useConfirmation';
+import {ActionBar,Sheet,TabBar,TeamDot,TopBar,teamIndex,useToast} from './ui';
+import MatchClock from './public/MatchClock';
+import GoalSheet from './public/GoalSheet';
 
-// randomUUID requires HTTPS; getRandomValues also works on a local HTTP network.
+// randomUUID exige HTTPS; getRandomValues também funciona na rede local por HTTP.
 function newMatchId(){
   if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
   const bytes=crypto.getRandomValues(new Uint8Array(16));
@@ -16,179 +16,261 @@ function newMatchId(){
   const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
+const withScore=(m:Match):Match=>({...m,homeScore:m.goals.filter(g=>g.teamId===m.homeId).length,awayScore:m.goals.filter(g=>g.teamId===m.awayId).length});
+/** Conteúdo que o placar mostra; o relógio fica de fora porque muda sem mexer nos gols. */
+const content=(m?:Match)=>m?JSON.stringify([m.homeId,m.awayId,m.goals]):'';
+class GoalsChanged extends Error{constructor(public current:Match){super('O placar mudou.');}}
 
+type Tab='jogo'|'times'|'resumo';
+type GoalTarget={teamId:string;matchId?:string;index?:number;seen?:string;key:number};
+
+/** Página aberta pelo link da pelada: placar ao vivo, relógio, times e resumo. Sem login. */
 export default function PublicPeladaPage({number}:{number:number}){
-  const [data,setData]=useState<PublicPelada|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState('');
-  const [tab,setTab]=useState<'update'|'summary'|'teams'>('update'),[ranking,setRanking]=useState<'goals'|'assists'>('goals');
-  const [draft,setDraft]=useState<Match|null>(null),[version,setVersion]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
-  const [noticeError,setNoticeError]=useState(false);
-  const [deleting,setDeleting]=useState(false),[deletePassword,setDeletePassword]=useState(''),[deleteError,setDeleteError]=useState('');
-  const [showAllRanking,setShowAllRanking]=useState(false);
-  const [goalPage,setGoalPage]=useState(0);
-  const [lastSync,setLastSync]=useState<Date|null>(null);
-  const [quickGoal,setQuickGoal]=useState<{match:Match;teamId:string;etag:string;scorer:string;assist:string;error:string}|null>(null);
   const {confirm,confirmation}=useConfirmation();
-  const editorRef=useRef<HTMLElement>(null);
-  useEffect(()=>{if(draft){editorRef.current?.closest('main')?.scrollIntoView?.({block:'start'});editorRef.current?.closest('main')?.querySelector<HTMLElement>('h2')?.focus({preventScroll:true});}},[draft?.id]);
-  const refresh=useCallback(async()=>{try{setData(await getPelada(number));setLastSync(new Date());setError('');}catch(e){if(e instanceof PeladaError&&e.status===404)setData(null);setError((e as Error).message);}finally{setLoading(false);}},[number]);
-  useEffect(()=>{void refresh();const timer=setInterval(()=>{if(document.visibilityState==='visible')void refresh();},12000);const visible=()=>{if(document.visibilityState==='visible')void refresh();};document.addEventListener('visibilitychange',visible);return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',visible);};},[refresh]);
-  const summary=data?summarize(data,data.players):null;
-  const teamName=(id:string)=>data?.teams.find(t=>t.id===id)?.name||id;
-  async function edit(match?:Match){
-    if(!data)return;
-    if(data.teams.length<2){setNoticeError(true);setNotice('É preciso publicar pelo menos dois times para criar uma partida.');return;}
-    if(draft&&!await confirm('Descartar a edição atual para abrir outra partida?'))return;
-    const next:Match=match?{...structuredClone(match),status:'finished'}:{id:newMatchId(),homeId:data.teams[0].id,awayId:data.teams[1].id,status:'finished',homeScore:0,awayScore:0,goals:[]};
-    setDeleting(false);setDeletePassword('');setDeleteError('');
-    setGoalPage(0);setQuickGoal(null);setDraft(next);
-    setVersion(data.etag);setNotice('');setNoticeError(false);setTab('update');
+  const {toast,show}=useToast();
+  const [data,setData]=useState<PublicPelada|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[online,setOnline]=useState(true);
+  const [offset,setOffset]=useState(0);
+  const [tab,setTab]=useState<Tab>('jogo');
+  const [edit,setEdit]=useState<{draft:Match;original:string}|null>(null);
+  const [goal,setGoal]=useState<GoalTarget|null>(null),[goalError,setGoalError]=useState('');
+  const [sheet,setSheet]=useState<'new'|'teams'|'delete'|null>(null);
+  const [pick,setPick]=useState<string[]>([]);
+  const [password,setPassword]=useState(''),[deleteError,setDeleteError]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [ranking,setRanking]=useState<'goals'|'assists'>('goals'),[showAll,setShowAll]=useState(false);
+  const dataRef=useRef<PublicPelada|null>(null);
+
+  const refresh=useCallback(async():Promise<PublicPelada|null>=>{
+    try{
+      const fresh=await getPelada(number);
+      dataRef.current=fresh;setData(fresh);setError('');setOnline(true);
+      if(fresh.serverNow)setOffset(fresh.serverNow-Date.now());
+      return fresh;
+    }catch(e){
+      if(e instanceof PeladaError&&e.status===404){dataRef.current=null;setData(null);}else setOnline(false);
+      setError((e as Error).message);return null;
+    }finally{setLoading(false);}
+  },[number]);
+  useEffect(()=>{
+    void refresh();
+    const tick=()=>{if(document.visibilityState==='visible')void refresh();};
+    const timer=setInterval(tick,12000);document.addEventListener('visibilitychange',tick);
+    return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',tick);};
+  },[refresh]);
+
+  const unsaved=!!edit&&content(edit.draft)!==edit.original||!!goal?.matchId;
+  useEffect(()=>{
+    if(!unsaved)return;
+    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
+    window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);
+  },[unsaved]);
+  useEffect(()=>{window.scrollTo?.(0,0);document.querySelector<HTMLElement>('.topbar h1')?.focus({preventScroll:true});},[tab,!!edit]);
+
+  /** Grava sobre a versão mais recente. Se outra pessoa salvou antes, relê e tenta uma vez de novo. */
+  async function write(build:(fresh:PublicPelada)=>unknown){
+    let fresh=dataRef.current;
+    for(let attempt=0;attempt<2;attempt++){
+      if(!fresh)throw new Error('Sem conexão com a pelada. Tente de novo.');
+      const body=build(fresh);
+      try{await changePelada(number,body);await refresh();return;}
+      catch(e){const latest=await refresh();if(attempt===1||!latest||latest.etag===fresh.etag)throw e;fresh=latest;}
+    }
   }
-  async function openQuickGoal(match:Match,teamId:string){
-    if(!data||busy)return;
-    if(draft&&!await confirm('Descartar a edição atual para adicionar este gol?'))return;
-    setDraft(null);setNotice('');setNoticeError(false);
-    setQuickGoal({match:structuredClone(match),teamId,etag:data.etag,scorer:'',assist:'',error:''});
+
+  const teams=data?.teams??[],players=data?.players??[];
+  const team=(id:string)=>teams.find(t=>t.id===id);
+  const label=(id:string)=>teamLabel(team(id),players);
+  const name=(id:string|null)=>players.find(p=>p.id===id)?.name??'Jogador';
+  const members=(teamId:string)=>{const t=team(teamId);if(!t)return [];return [...t.playerIds].sort((a,b)=>Number(b===t.leaderId)-Number(a===t.leaderId)).map(id=>({id,name:name(id)}));};
+  const goalText=(g:Goal)=>g.ownGoal?`Gol contra · ponto para ${label(g.teamId)}.`:`Gol de ${name(g.scorerId)}${g.assistId?` · assistência de ${name(g.assistId)}`:''}.`;
+  const duration=data?.duration??DEFAULT_MATCH_MINUTES;
+
+  const openGoal=(teamId:string,match?:Match,index?:number)=>{setGoalError('');setGoal({teamId,matchId:match?.id,index,seen:match?JSON.stringify(match.goals):undefined,key:Date.now()});};
+  const closeGoal=()=>{setGoal(null);setGoalError('');};
+  async function pickGoal(g:Goal){
+    if(!goal)return;
+    if(!goal.matchId){
+      setEdit(e=>{if(!e)return e;const goals=[...e.draft.goals];if(goal.index!==undefined)goals[goal.index]=g;else goals.push(g);return {...e,draft:withScore({...e.draft,goals})};});
+      closeGoal();return;
+    }
+    const target=goal;setBusy(true);setGoalError('');
+    try{
+      await write(fresh=>{
+        const current=fresh.matches.find(m=>m.id===target.matchId);
+        if(!current)throw new Error('Esta partida foi excluída em outro celular.');
+        if(JSON.stringify(current.goals)!==target.seen)throw new GoalsChanged(current);
+        const match=withScore({...current,status:'finished',goals:[...current.goals,g]});
+        if(match.homeScore>30||match.awayScore>30)throw new Error('Limite de 30 gols por time.');
+        const {clock:_clock,...body}=match;
+        return {action:'saveMatch',match:body,etag:fresh.etag};
+      });
+      closeGoal();show(goalText(g));
+    }catch(e){
+      if(e instanceof GoalsChanged){
+        const m=e.current;setGoal({...target,seen:JSON.stringify(m.goals)});
+        setGoalError(`O placar mudou em outro celular: ${label(m.homeId)} ${m.homeScore} × ${m.awayScore} ${label(m.awayId)}. Se este gol ainda não foi marcado, salve mesmo assim.`);
+      }else setGoalError((e as Error).message);
+    }finally{setBusy(false);}
   }
-  async function saveQuickGoal(){
-    if(!quickGoal||!quickGoal.scorer||busy)return;
-    const q=quickGoal,side=q.teamId===q.match.homeId?'homeScore':'awayScore';
-    if(q.match[side]>=30)return;
-    const ownGoal=q.scorer==='own';
-    const match:Match={...q.match,status:'finished',[side]:q.match[side]+1,goals:[...q.match.goals,{teamId:q.teamId,scorerId:ownGoal?null:q.scorer,assistId:ownGoal?null:q.assist||null,ownGoal}]};
-    setBusy(true);
-    try{await changePelada(number,{action:'saveMatch',match,etag:q.etag});setQuickGoal(null);setNotice('Gol adicionado. Placar e estatísticas atualizados!');await refresh();}
-    catch(e){setQuickGoal(current=>current?{...current,error:(e as Error).message}:null);await refresh();}
+  async function clockChange(match:Match,op:'start'|'pause'|'reset'){
+    setData(d=>d&&{...d,matches:d.matches.map(m=>m.id===match.id?{...m,clock:changeClock(m.clock,op,Date.now()+offset)}:m)});
+    try{await changePelada(number,{action:'clock',matchId:match.id,op});}catch(e){show((e as Error).message,true);}
+    await refresh();
+  }
+  const togglePick=(id:string)=>setPick(list=>list.includes(id)?list.filter(x=>x!==id):[...list,id].slice(-2));
+  async function startMatch(){
+    if(pick.length!==2||busy)return;setBusy(true);
+    const match:Match={id:newMatchId(),homeId:pick[0],awayId:pick[1],status:'finished',homeScore:0,awayScore:0,goals:[]};
+    try{await write(fresh=>({action:'saveMatch',match,etag:fresh.etag}));setSheet(null);setPick([]);show('Partida criada. Inicie o relógio quando a bola rolar.');}
+    catch(e){show((e as Error).message,true);}
     finally{setBusy(false);}
   }
-  async function changeTeam(side:'homeId'|'awayId',id:string){
-    if(!draft)return;
-    if(draft.goals.length&&!await confirm('Trocar o time vai zerar o placar e remover os gols e assistências desta edição. Deseja continuar? Você ainda pode cancelar a edição para recuperar a partida salva.'))return;
-    setDraft({...draft,[side]:id,homeScore:0,awayScore:0,goals:[]});
-  }
-  async function reviewQuickGoal(){
-    if(!quickGoal||!data)return;
-    const current=data.matches.find(m=>m.id===quickGoal.match.id);
-    if(!current||current.homeId!==quickGoal.match.homeId||current.awayId!==quickGoal.match.awayId)return;
-    if(!await confirm('Confira se este gol já foi registrado por outra pessoa. Deseja manter autor e assistência escolhidos para revisar e salvar com o placar atualizado?'))return;
-    setQuickGoal({...quickGoal,match:structuredClone(current),etag:data.etag,error:''});
-  }
-  function addGoal(teamId:string){
-    if(!draft)return;
-    const side=teamId===draft.homeId?'homeScore':'awayScore';
-    if(draft[side]>=30)return;
-    setGoalPage(Math.floor(draft.goals.length/4));
-    setDraft({...draft,[side]:draft[side]+1,goals:[...draft.goals,{teamId,scorerId:null,assistId:null,ownGoal:false}]});
-  }
-  function removeGoal(index:number){
-    if(!draft)return;const goal=draft.goals[index],side=goal.teamId===draft.homeId?'homeScore':'awayScore';
-    setDraft({...draft,[side]:draft[side]-1,goals:draft.goals.filter((_,i)=>i!==index)});
-  }
-  function changeGoal(index:number,change:Partial<Goal>){if(draft)setDraft({...draft,goals:draft.goals.map((g,i)=>i===index?{...g,...change}:g)});}
-  async function save(){
-    if(!draft||busy)return;
-    setBusy(true);setNotice('');setNoticeError(false);
-    try{await changePelada(number,{action:'saveMatch',match:draft,etag:version});setDraft(null);setNotice(isNewMatch?'Partida criada! Use Adicionar gol para atualizar durante o jogo.':'Partida salva. Estatísticas atualizadas!');await refresh();}
-    catch(e){setNoticeError(true);setNotice((e as Error).message);await refresh();}
+
+  const openEdit=(m:Match)=>{setEdit({draft:structuredClone(m),original:content(m)});};
+  const leaveEdit=async()=>{if(edit&&content(edit.draft)!==edit.original&&!await confirm('Descartar as alterações desta partida?'))return;setEdit(null);setSheet(null);};
+  const saved=edit?data?.matches.find(m=>m.id===edit.draft.id):undefined;
+  const stale=!!edit&&!!data&&content(saved)!==edit.original;
+  async function saveEdit(){
+    if(!edit||stale||busy)return;setBusy(true);
+    try{
+      await write(fresh=>{
+        if(content(fresh.matches.find(m=>m.id===edit.draft.id))!==edit.original)throw new Error('A partida mudou em outro celular. Volte e abra de novo.');
+        const {clock:_clock,...match}=edit.draft;
+        return {action:'saveMatch',match:{...match,status:'finished'},etag:fresh.etag};
+      });
+      setEdit(null);show('Partida salva.');
+    }catch(e){show((e as Error).message,true);}
     finally{setBusy(false);}
   }
   async function deleteMatch(){
-    if(!draft||busy||!deletePassword.trim())return;
-    if(!await confirm('Excluir esta partida? O resultado, os gols e as assistências dela serão removidos das estatísticas. Esta ação não pode ser desfeita.'))return;
-    setBusy(true);setDeleteError('');
-    try{
-      await changePelada(number,{action:'deleteMatch',matchId:draft.id,password:deletePassword,etag:version});
-      setDraft(null);setDeleting(false);setDeletePassword('');setNoticeError(false);setNotice('Partida excluída. Estatísticas atualizadas!');await refresh();
-    }catch(e){setDeleteError((e as Error).message);await refresh();}
+    if(!edit||!password.trim()||busy)return;setBusy(true);setDeleteError('');
+    try{await write(fresh=>({action:'deleteMatch',matchId:edit.draft.id,password,etag:fresh.etag}));setSheet(null);setEdit(null);show('Partida excluída.');}
+    catch(e){setDeleteError((e as Error).message);}
     finally{setBusy(false);}
   }
-  const goalPageCount=Math.max(1,Math.ceil((draft?.goals.length||0)/4));
-  const visibleGoalPage=Math.min(goalPage,goalPageCount-1);
-  const isNewMatch=!!draft&&!data?.matches.some(m=>m.id===draft.id);
-  const hasUnsavedChanges=!!quickGoal?.scorer||!!draft&&JSON.stringify(draft)!==JSON.stringify(data?.matches.find(m=>m.id===draft.id));
-  useEffect(()=>{
-    if(!hasUnsavedChanges)return;
-    const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};
-    window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);
-  },[hasUnsavedChanges]);
-  const played=summary?.table.some(t=>t.played);
-  const first=summary?.table[0];
-  const leaders=played?summary!.table.filter(t=>t.points===first!.points&&t.balance===first!.balance&&t.goalsFor===first!.goalsFor).map(t=>t.name).join(' · '):'Aguardando partidas';
-  function top(key:'goals'|'assists'){
-    const max=Math.max(0,...(summary?.totals.map(p=>p[key])||[]));
-    return max?summary!.totals.filter(p=>p[key]===max).map(p=>p.name).join(' · ')+` (${max})`:null;
+  function applyTeams(){
+    if(!edit||pick.length!==2)return;
+    setEdit({...edit,draft:{...edit.draft,homeId:pick[0],awayId:pick[1],goals:[],homeScore:0,awayScore:0}});setSheet(null);
   }
-  const ranked=summary?[...summary.totals].sort((a,b)=>b[ranking]-a[ranking]||a.name.localeCompare(b.name)):[];
-  function renderMatch(m:Match,index:number,featured=false){
-    if(!data)return null;
-    const home=data!.teams.findIndex(t=>t.id===m.homeId),away=data!.teams.findIndex(t=>t.id===m.awayId);
-    return <article key={m.id} className={'panel match-card '+(featured?'featured':'')} aria-label={`Partida ${index}`}>
-      <div className="match-top"><div className="match-index"><CircleDot size={17} aria-hidden="true"/><span>Partida {index}</span>{featured&&<span className="latest-label">Mais recente</span>}</div><button className="button subtle edit-match" disabled={busy} onClick={()=>void edit(m)}><Pencil size={15} aria-hidden="true"/> Editar</button></div>
-      <div className="scoreboard" aria-label={`${teamName(m.homeId)} ${m.homeScore} a ${m.awayScore} ${teamName(m.awayId)}`}>
-        <div className="score-side"><span className="team-marker" data-team={home%4}><Users size={18} aria-hidden="true"/></span><h3>{teamName(m.homeId)}</h3><strong className="score-number">{m.homeScore}</strong></div>
-        <span className="score-divider" aria-hidden="true">×</span>
-        <div className="score-side"><span className="team-marker" data-team={away%4}><Users size={18} aria-hidden="true"/></span><h3>{teamName(m.awayId)}</h3><strong className="score-number">{m.awayScore}</strong></div>
+
+  function renderScore(m:Match){
+    const side=(id:string,n:number)=>{const t=team(id),text=label(id);
+      return <div className="score-side"><span className="score-team"><TeamDot index={teamIndex(teams,id)}/><span>{text}</span></span>{t&&text!==t.name&&<span className="score-ref">{t.name}</span>}<span className="score-n">{n}</span></div>;};
+    return <div className="score" role="group" aria-label={`${label(m.homeId)} ${m.homeScore} a ${m.awayScore} ${label(m.awayId)}`}>{side(m.homeId,m.homeScore)}<span className="score-x" aria-hidden="true">×</span>{side(m.awayId,m.awayScore)}</div>;
+  }
+  const matchNumber=(id:string)=>{const i=data?.matches.findIndex(m=>m.id===id)??-1;return i>=0?i+1:(data?.matches.length??0)+1;};
+
+  const sheets=data&&<>
+    {goal&&<GoalSheet key={goal.key} open teamId={goal.teamId} title={`Gol · ${label(goal.teamId)}`} members={members(goal.teamId)} initial={goal.index!==undefined?edit?.draft.goals[goal.index]:undefined}
+      busy={busy} error={goalError} onPick={g=>void pickGoal(g)} onClose={closeGoal}/>}
+    <Sheet open={sheet==='new'||sheet==='teams'} title={sheet==='teams'?'Trocar times':'Nova partida'} subtitle="Toque nos dois times que vão jogar" onClose={()=>setSheet(null)}>
+      <div className="pick">{teams.map((t,i)=><button key={t.id} type="button" className="wide" aria-pressed={pick.includes(t.id)} onClick={()=>togglePick(t.id)}><TeamDot index={i%4}/>{label(t.id)}</button>)}</div>
+      {sheet==='new'&&<div className="kv"><div className="kv-text"><strong>Tempo da partida</strong><small>Definido pelo organizador</small></div><strong>{duration} min</strong></div>}
+      {sheet==='teams'&&!!edit?.draft.goals.length&&<div className="notice" role="note"><TriangleAlert size={18} aria-hidden="true"/><span>Trocar os times apaga os gols desta edição. Nada é gravado até você salvar a partida.</span></div>}
+      <button type="button" className="btn primary block" disabled={pick.length!==2||busy} onClick={()=>sheet==='teams'?applyTeams():void startMatch()}>
+        {busy&&<LoaderCircle className="spin" size={18} aria-hidden="true"/>}{sheet==='teams'?'Trocar times':'Começar partida'}</button>
+    </Sheet>
+    <Sheet open={sheet==='delete'} title={`Excluir a partida ${edit?matchNumber(edit.draft.id):''}?`} subtitle="O placar, os gols e as assistências saem do resumo" onClose={()=>setSheet(null)}>
+      <form className="choices" onSubmit={e=>{e.preventDefault();void deleteMatch();}}>
+        <div className="field"><label htmlFor="delete-match-password">Senha da pelada</label><input id="delete-match-password" type="password" autoComplete="off" maxLength={100} value={password} onChange={e=>setPassword(e.target.value)}/><small>Peça a senha ao organizador.</small></div>
+        {deleteError&&<p className="error-text" role="alert">{deleteError}</p>}
+        <button type="submit" className="btn danger block" disabled={busy||!password.trim()}>Excluir partida</button>
+        <button type="button" className="btn subtle block" onClick={()=>setSheet(null)}>Cancelar</button>
+      </form>
+    </Sheet>
+  </>;
+
+  if(edit&&data){
+    const m=edit.draft;
+    return <div className="app">{confirmation}
+      <main className="page has-actionbar screen-enter match-editor">
+        <TopBar title={`Partida ${matchNumber(m.id)}`} subtitle={`${label(m.homeId)} × ${label(m.awayId)}`} onBack={()=>void leaveEdit()}/>
+        {stale&&<div className="notice error" role="alert"><TriangleAlert size={18} aria-hidden="true"/><span>Esta partida mudou em outro celular. Volte e abra de novo para ver a versão atual.</span></div>}
+        <section className="card" aria-label="Placar desta edição">{renderScore(m)}
+          <div className="pair">{[m.homeId,m.awayId].map(id=><button key={id} type="button" className="btn subtle" aria-label={`Adicionar gol para ${label(id)}`} disabled={(id===m.homeId?m.homeScore:m.awayScore)>=30} onClick={()=>openGoal(id)}><Plus size={18} aria-hidden="true"/> Gol</button>)}</div>
+        </section>
+        <h2 className="label">Gols da partida</h2>
+        {m.goals.length?m.goals.map((g,i)=><div key={i} className="goal-line goal-entry"><TeamDot index={teamIndex(teams,g.teamId)}/>
+          <button type="button" className="row-main" aria-label={`Alterar gol ${i+1}`} onClick={()=>openGoal(g.teamId,undefined,i)}><b>{g.ownGoal?'Gol contra':name(g.scorerId)}</b><span>{g.ownGoal?`ponto para ${label(g.teamId)}`:g.assistId?`assistência de ${name(g.assistId)}`:'sem assistência'}</span></button>
+          <button type="button" className="icon-btn" aria-label={`Remover gol ${i+1}`} onClick={()=>setEdit({...edit,draft:withScore({...m,goals:m.goals.filter((_,n)=>n!==i)})})}><Trash2 size={18} aria-hidden="true"/></button>
+        </div>):<p className="muted">Nenhum gol nesta partida. Use + Gol para adicionar.</p>}
+        <div className="list">
+          <button type="button" className="row" onClick={()=>{setPick([m.homeId,m.awayId]);setSheet('teams');}}><ArrowLeftRight size={20} aria-hidden="true"/><span className="row-main"><strong>Trocar times</strong></span></button>
+          <button type="button" className="row danger" onClick={()=>{setPassword('');setDeleteError('');setSheet('delete');}}><Trash2 size={20} aria-hidden="true"/><span className="row-main"><strong>Excluir partida</strong><small>Pede a senha da pelada</small></span></button>
+        </div>
+        <ActionBar><button type="button" className="btn primary block" disabled={busy||stale} onClick={()=>void saveEdit()}>{busy&&<LoaderCircle className="spin" size={18} aria-hidden="true"/>} Salvar partida</button></ActionBar>
+      </main>
+      {sheets}{toast}
+    </div>;
+  }
+
+  const title=formatPeladaDay(data?.date)||`Pelada ${number}`;
+  const status=<span className={'chip '+(online?'live':'offline')}>{online?'ao vivo':'sem conexão'}</span>;
+  let body;
+  if(loading)body=<div className="loading" role="status"><LoaderCircle className="spin" size={28} aria-hidden="true"/>Carregando pelada…</div>;
+  else if(!data)body=<div className="card empty" role="alert"><strong>Pelada não encontrada</strong><p>{error||'Confira o link com o organizador.'}</p><button type="button" className="btn subtle" onClick={()=>void refresh()}>Tentar de novo</button></div>;
+  else if(!teams.length)body=<div className="card empty"><Users size={28} aria-hidden="true"/><strong>Aguardando os times</strong><p>O organizador ainda vai sortear os times. Esta página se atualiza sozinha.</p></div>;
+  else if(tab==='times')body=teams.map((t,i)=><article key={t.id} className="team-card"><h2><TeamDot index={i%4}/>{label(t.id)}<small>{label(t.id)!==t.name?`${t.name} · `:''}{t.playerIds.length} jogadores</small></h2>
+    <ul>{members(t.id).map(p=><li key={p.id}>{p.id===t.leaderId?<b>{p.name}</b>:p.name}</li>)}</ul></article>);
+  else if(tab==='resumo'){
+    const summary=summarize(data,players),played=summary.table.some(t=>t.played),first=summary.table[0];
+    const leaders=played?summary.table.filter(t=>t.points===first.points&&t.balance===first.balance&&t.goalsFor===first.goalsFor):[];
+    const top=(key:'goals'|'assists')=>{const max=Math.max(0,...summary.totals.map(p=>p[key]));return max?{names:summary.totals.filter(p=>p[key]===max).map(p=>p.name).join(' · '),max}:null;};
+    const scorer=top('goals'),assist=top('assists');
+    const ranked=[...summary.totals].sort((a,b)=>b[ranking]-a[ranking]||a.name.localeCompare(b.name,'pt-BR'));
+    const visible=showAll?ranked:ranked.filter(p=>p[ranking]>0);
+    body=<>
+      <div className="tiles">
+        <div className="tile"><small>Líder</small>{leaders.length?<><b className="leader-name">{leaders.map(t=>label(t.id)).join(' · ')}</b><span>{first.points} pontos</span></>:<span className="summary-empty">Sem partidas</span>}</div>
+        <div className="tile"><small>Artilheiro</small>{scorer?<><b className="leader-name">{scorer.names}</b><span>{scorer.max} {scorer.max===1?'gol':'gols'}</span></>:<span className="summary-empty">Sem gols</span>}</div>
+        <div className="tile"><small>Garçom</small>{assist?<><b className="leader-name">{assist.names}</b><span>{assist.max} assist.</span></>:<span className="summary-empty">Sem assistências</span>}</div>
       </div>
-      <span className="sr-only">{m.homeScore} × {m.awayScore}</span>
-      <div className="match-grid goal-actions">{[m.homeId,m.awayId].map(id=><button className="button primary" key={id} disabled={busy||(id===m.homeId?m.homeScore:m.awayScore)>=30} onClick={()=>void openQuickGoal(m,id)}>+ Gol · {teamName(id)}</button>)}</div>
-      {quickGoal?.match.id===m.id&&<form className="quick-goal" aria-label="Adicionar gol" onSubmit={e=>{e.preventDefault();void saveQuickGoal();}}>
-            <h4>Gol do {teamName(quickGoal.teamId)}</h4>
-            <fieldset disabled={busy}><div className="match-grid">
-              <label>De quem foi o gol?<select aria-label="De quem foi o gol?" required value={quickGoal.scorer} onChange={e=>setQuickGoal({...quickGoal,scorer:e.target.value,assist:''})}><option value="">Selecione o jogador</option>{data.players.filter(p=>data.teams.find(t=>t.id===quickGoal.teamId)?.playerIds.includes(p.id)).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}<option value="own">Gol contra do adversário</option></select></label>
-              <label>De quem foi a assistência?<select aria-label="De quem foi a assistência?" disabled={!quickGoal.scorer||quickGoal.scorer==='own'} value={quickGoal.assist} onChange={e=>setQuickGoal({...quickGoal,assist:e.target.value})}><option value="">Sem assistência</option>{data.players.filter(p=>p.id!==quickGoal.scorer&&data.teams.find(t=>t.id===quickGoal.teamId)?.playerIds.includes(p.id)).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-            </div>
-            {quickGoal.error&&<p role="alert" className="error-text">{quickGoal.error}</p>}
-            {quickGoal.etag!==data.etag&&<p role="alert" className="error-text">O placar foi atualizado por outra pessoa. Suas escolhas foram mantidas. Confira o gol antes de continuar.</p>}
-            {quickGoal.etag!==data.etag&&<button type="button" className="button subtle full" onClick={()=>void reviewQuickGoal()}>Revisar com placar atualizado</button>}
-            <div className="button-row"><button type="button" className="button subtle" onClick={()=>setQuickGoal(null)}>Cancelar</button><button type="submit" className="button primary" disabled={!quickGoal.scorer||quickGoal.etag!==data.etag}>{busy?'Salvando…':'Salvar gol'}</button></div></fieldset>
-          </form>}
-      {m.goals.length>0?<details className="match-events"><summary><span><Target size={15} aria-hidden="true"/> {m.goals.length} {m.goals.length===1?'gol registrado':'gols registrados'}</span><ChevronDown size={16} aria-hidden="true"/></summary><div>{m.goals.map((g,j)=><div key={j} className="match-event"><span className="event-icon"><Target size={16} aria-hidden="true"/></span><div><strong>{g.ownGoal?`Gol contra a favor do ${teamName(g.teamId)}`:data!.players.find(p=>p.id===g.scorerId)?.name}</strong><span>{g.assistId?`Assistência de ${data!.players.find(p=>p.id===g.assistId)?.name}`:'Sem assistência'} · {teamName(g.teamId)}</span></div></div>)}</div></details>:<p className="no-goals">O placar está aberto. Adicione o primeiro gol.</p>}
-    </article>;
+      <section className="card"><h2 className="label">Classificação</h2>
+        <table className="table"><caption className="sr-only">Classificação dos times</caption><thead><tr><th scope="col">Time</th><th scope="col"><abbr title="Pontos">P</abbr></th><th scope="col"><abbr title="Jogos">J</abbr></th><th scope="col"><abbr title="Vitórias">V</abbr></th><th scope="col"><abbr title="Saldo de gols">SG</abbr></th></tr></thead>
+          <tbody>{summary.table.map(t=><tr key={t.id}><td><span><TeamDot index={teamIndex(teams,t.id)}/>{label(t.id)}</span></td><td><b>{t.points}</b></td><td>{t.played}</td><td>{t.wins}</td><td>{t.balance>0?'+':''}{t.balance}</td></tr>)}</tbody></table>
+        <p className="muted small">Vitória vale 3 pontos e empate 1. Desempate por saldo e por gols marcados.</p>
+      </section>
+      <section className="card"><div className="seg" role="group" aria-label="Ranking individual">
+          <button type="button" aria-pressed={ranking==='goals'} onClick={()=>setRanking('goals')}>Gols</button>
+          <button type="button" aria-pressed={ranking==='assists'} onClick={()=>setRanking('assists')}>Assistências</button></div>
+        <div className="leaders">{visible.length?visible.map(p=><div key={p.id} className="kv ranking-result"><span>{p.name}</span><b>{p[ranking]}</b></div>)
+          :<p className="muted">Ainda não há {ranking==='goals'?'gols':'assistências'}.</p>}</div>
+        {ranked.some(p=>p[ranking]===0)&&<button type="button" className="btn text" aria-expanded={showAll} onClick={()=>setShowAll(!showAll)}>{showAll?'Mostrar só quem marcou':`Ver todos os ${ranked.length} jogadores`}</button>}
+      </section>
+    </>;
+  }else{
+    const current=data.matches[data.matches.length-1],previous=data.matches.slice(0,-1).reverse();
+    body=<>
+      {current?<section className="card match-card" aria-label={`Partida ${data.matches.length}, agora`}>
+        <div className="card-head"><span className="label">Partida {data.matches.length} · agora</span>
+          <button type="button" className="btn text small" disabled={busy} onClick={()=>openEdit(current)}><Pencil size={16} aria-hidden="true"/> Editar</button></div>
+        <MatchClock clock={current.clock} duration={duration} offset={offset} busy={busy} onChange={op=>void clockChange(current,op)}/>
+        {renderScore(current)}
+        <div className="pair">{[current.homeId,current.awayId].map(id=><button key={id} type="button" className="btn primary" aria-label={`Gol para ${label(id)}`} disabled={busy||(id===current.homeId?current.homeScore:current.awayScore)>=30} onClick={()=>openGoal(id,current)}><Plus size={18} aria-hidden="true"/> Gol</button>)}</div>
+        {current.goals.length>0&&<ul className="events" aria-label="Gols desta partida">{[...current.goals].reverse().map((g,i)=><li key={i}><TeamDot index={teamIndex(teams,g.teamId)}/>{g.ownGoal?'Gol contra':name(g.scorerId)}<span>{g.assistId?`· assist. ${name(g.assistId)}`:''}</span></li>)}</ul>}
+      </section>
+      :<div className="card empty"><CircleDot size={28} aria-hidden="true"/><strong>Nenhuma partida ainda</strong><p>Escolha os dois times que vão jogar. Depois marque os gols conforme o jogo acontece.</p></div>}
+      <button type="button" className={'btn block '+(current?'subtle':'primary')} onClick={()=>{setPick([]);setSheet('new');}}><Plus size={18} aria-hidden="true"/> Nova partida</button>
+      {previous.length>0&&<><h2 className="label">Partidas anteriores</h2>
+        <div className="list match-history">{previous.map(m=><button key={m.id} type="button" className="row" aria-label={`Editar partida ${matchNumber(m.id)}`} onClick={()=>openEdit(m)}>
+          <span className="row-main"><small>Partida {matchNumber(m.id)}</small><span className="match-row-teams">
+            <span className="match-row-team"><TeamDot index={teamIndex(teams,m.homeId)}/>{label(m.homeId)}<b>{m.homeScore}</b></span>
+            <span className="match-row-team"><TeamDot index={teamIndex(teams,m.awayId)}/>{label(m.awayId)}<b>{m.awayScore}</b></span></span></span>
+          <ChevronRight className="chev" size={20} aria-hidden="true"/></button>)}</div></>}
+    </>;
   }
-  if(draft&&data)return <div className={'app public-pelada ds-editor-page'+(!isNewMatch?' ds-editor-minimal':'')}>{confirmation}<main className="ds-editor-main"><ScreenHeader title={isNewMatch?'Nova partida':'Editar partida'} context={data.date?`Pelada · ${formatPeladaDate(data.date)}`:`Pelada ${number}`} disabled={busy} onBack={()=>{void confirm('Descartar esta edição?').then(ok=>{if(ok)setDraft(null);});}}/>
-{<section className={'panel match-editor'+(!isNewMatch?' edit-existing':'')} ref={editorRef} aria-labelledby="match-editor-title"><div className="edit-heading">{!isNewMatch&&<span className="edit-heading-icon" aria-hidden="true"><Pencil size={19}/></span>}<div><h3 id="match-editor-title">{isNewMatch?'Nova partida':'Editar partida'}</h3>{!isNewMatch&&<p>Confira os times e ajuste os gols abaixo.</p>}</div></div>
-            {version!==data.etag&&<p role="alert" className="error-text">A pelada mudou em outro dispositivo. Sua edição foi mantida. Cancele e reabra a partida antes de salvar.</p>}
-            <fieldset disabled={busy}><legend className="sr-only">{isNewMatch?'Times da partida':'Times e resultado'}</legend><details className="ds-team-disclosure" open={isNewMatch}><summary>{isNewMatch?'Times da partida':'Alterar times'} <ChevronDown size={16}/></summary><div className="match-grid">
-              <label>Time A<select value={draft.homeId} onChange={e=>void changeTeam('homeId',e.target.value)}>{data.teams.map(t=><option key={t.id} value={t.id} disabled={t.id===draft.awayId}>{t.name}</option>)}</select></label>
-              <label>Time B<select value={draft.awayId} onChange={e=>void changeTeam('awayId',e.target.value)}>{data.teams.map(t=><option key={t.id} value={t.id} disabled={t.id===draft.homeId}>{t.name}</option>)}</select></label>
-            </div></details>
-            {!isNewMatch&&<><div className="live-score edit-score" aria-label="Placar atual"><span className="edit-score-team">{teamName(draft.homeId)}</span><strong>{draft.homeScore} <span className="edit-score-divider">×</span> {draft.awayScore}</strong><span className="edit-score-team">{teamName(draft.awayId)}</span><span className="edit-score-caption">Placar desta edição</span></div><div className="edit-goals-heading"><h4>Gols e assistências</h4><span>{draft.goals.length} {draft.goals.length===1?'gol':'gols'}</span></div><div className="match-grid edit-add-goals">{[draft.homeId,draft.awayId].map(id=><button type="button" className="button primary" key={id} disabled={(id===draft.homeId?draft.homeScore:draft.awayScore)>=30} onClick={()=>addGoal(id)}>+ Gol · {teamName(id)}</button>)}</div>
-              {draft.goals.map((g,i)=>{if(Math.floor(i/4)!==visibleGoalPage)return null;const members=data.players.filter(p=>data.teams.find(t=>t.id===g.teamId)?.playerIds.includes(p.id));return <div className="goal-entry" key={i}><div className="edit-goal-heading"><strong>{teamName(g.teamId)} · Gol {draft.goals.slice(0,i+1).filter(x=>x.teamId===g.teamId).length}</strong><button type="button" className="button subtle" aria-label={`Remover gol ${i+1}`} title="Remover gol" onClick={()=>removeGoal(i)}><Trash2 size={17} aria-hidden="true"/></button></div><div className="match-grid">
-                <label>Autor<select aria-label={`Quem fez o gol ${i+1}`} value={g.ownGoal?'own':g.scorerId||''} onChange={e=>changeGoal(i,{scorerId:e.target.value==='own'?null:e.target.value||null,ownGoal:e.target.value==='own',assistId:null})}><option value="">Selecione o jogador</option>{members.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}<option value="own">Gol contra do adversário</option></select></label>
-                <label>Assistência<select aria-label={`Assistência do gol ${i+1}`} disabled={g.ownGoal||!g.scorerId} value={g.assistId||''} onChange={e=>changeGoal(i,{assistId:e.target.value||null})}><option value="">Sem assistência</option>{members.filter(p=>p.id!==g.scorerId).map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
-              </div></div>;})}
-              {draft.goals.length>4&&<div className="review-pagination"><button type="button" className="button subtle" disabled={visibleGoalPage===0} onClick={()=>setGoalPage(Math.max(0,visibleGoalPage-1))}>Gols anteriores</button><span>{visibleGoalPage+1} / {goalPageCount}</span><button type="button" className="button subtle" disabled={visibleGoalPage+1>=goalPageCount} onClick={()=>setGoalPage(visibleGoalPage+1)}>Próximos gols</button></div>}<p className="hint edit-goals-hint">{draft.goals.length?'Selecione o autor de cada gol. A assistência é opcional.':'Nenhum gol nesta partida. Use os botões acima para adicionar.'}</p>
-            </>}
-            <div className={'button-row'+(!isNewMatch?' edit-save-actions':'')}><button className="button subtle" onClick={()=>void confirm('Descartar esta edição?').then(ok=>{if(ok)setDraft(null);})}>{isNewMatch?'Cancelar':'Cancelar edição'}</button><button className="button primary" disabled={version!==data.etag||draft.goals.some(g=>!g.ownGoal&&!g.scorerId)} onClick={()=>void save()}>{busy?'Salvando…':isNewMatch?'Criar partida':'Salvar partida'}</button></div></fieldset>
-            {!isNewMatch&&<div className="match-delete-area">{!deleting?<button type="button" className="button danger" disabled={busy} onClick={()=>{setDeleting(true);setDeletePassword('');setDeleteError('');}}>Excluir partida</button>:<form onSubmit={e=>{e.preventDefault();void deleteMatch();}}><h4>Excluir esta partida</h4><p className="hint">O resultado, os gols e as assistências serão removidos.</p><label htmlFor="delete-match-password">Senha da pelada</label><input id="delete-match-password" type="password" autoComplete="off" maxLength={100} required value={deletePassword} disabled={busy} onChange={e=>setDeletePassword(e.target.value)}/><p className="hint">Peça a senha ao organizador para excluir esta partida.</p>{deleteError&&<p role="alert" className="error-text">{deleteError}</p>}<div className="button-row"><button type="button" className="button subtle" disabled={busy} onClick={()=>{setDeleting(false);setDeletePassword('');setDeleteError('');}}>Cancelar exclusão</button><button type="submit" className="button danger" disabled={busy||!deletePassword.trim()||version!==data.etag}>{busy?'Excluindo…':'Excluir partida'}</button></div></form>}</div>}
-          </section>}
-    {notice&&<p role={noticeError?'alert':'status'} className={noticeError?'error-text':'hint'}>{notice}</p>}
-    {error&&<p role="alert" className="error-text">{error}</p>}
-  </main></div>;
-  return <div className="app public-pelada">{confirmation}
-    <header className="header"><div className="header-inner"><div className="brand"><div className="brand-icon" aria-hidden="true">⚽</div><div><h1>PELA<span>DAMAS</span></h1><p>Página da pelada</p></div></div><button className="connection" onClick={()=>void refresh()}><RefreshCw size={16} aria-hidden="true"/> Atualizar</button></div></header>
-    <main className="main"><div className="public-heading"><div><h2>{data?.date?`Pelada · ${formatPeladaDate(data.date)}`:`Pelada ${number}`}<span className="heading-dot">.</span></h2><p>Partidas, times e estatísticas.</p></div><div className="sync-label" role="status"><span className="sync-dot"/>{lastSync?`Atualizado às ${lastSync.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`:'Conectando…'}</div></div>
-      <JourneyNav label="Página da pelada" value={tab} items={[{value:'update',label:'Partidas',icon:<CircleDot size={17} aria-hidden="true"/>},{value:'teams',label:'Times',icon:<Users size={17} aria-hidden="true"/>},{value:'summary',label:'Resumo',icon:<Trophy size={17} aria-hidden="true"/>}]} onChange={value=>setTab(value as typeof tab)}/>
-      {error&&<div className="panel error-text" role="alert">{error}<button className="button subtle" onClick={()=>void refresh()}>Tentar novamente</button></div>}
-      {loading?<p role="status">Carregando pelada…</p>:data&&<>
-        {!data.teams.length?<div className="panel"><h3>Aguardando os times</h3><p>O administrador precisa sortear e salvar os times. Esta página atualiza automaticamente.</p></div>:tab==='update'?<>
-          <div className="matches-toolbar"><div><h3>Partidas</h3></div>{!draft&&<button className="button primary" disabled={busy} onClick={()=>void edit()}><Plus size={18} aria-hidden="true"/> Criar partida</button>}</div>
-          {notice&&<div className={'match-notice'+(noticeError?' error':'')} role={noticeError?'alert':'status'}>{noticeError?<Info size={18} aria-hidden="true"/>:<Check size={18} aria-hidden="true"/>}{notice}</div>}
-          <section aria-label="Partidas desta pelada" className="match-list">
-            {!data.matches.length?(!draft&&<div className="empty-match"><h3>Nenhuma partida ainda</h3><p>Crie a partida escolhendo os dois times. Depois, registre os gols conforme o jogo acontece.</p></div>):<>
-              {renderMatch(data.matches[data.matches.length-1],data.matches.length,true)}
-              {data.matches.length>1&&<details className="match-history">
-                <summary><div><h3>Outros jogos desta pelada</h3><p>{data.matches.length-1} {data.matches.length===2?'partida registrada':'partidas registradas'} · consulte ou corrija os resultados</p></div><ChevronDown size={20} aria-hidden="true"/></summary>
-                <div className="history-matches">{[...data.matches].slice(0,-1).reverse().map((m,i)=>renderMatch(m,data.matches.length-i-1))}</div>
-              </details>}
-            </>}
-          </section>
-        </>:tab==='summary'?<>
-          <div className="stat-grid"><div className="stat"><div className="stat-label"><Trophy size={18} aria-hidden="true"/> Time líder</div>{played?<strong className="leader-name">{leaders}</strong>:<span className="summary-empty">Sem partidas</span>}</div><div className="stat"><div className="stat-label"><Target size={18} aria-hidden="true"/> Artilheiro</div>{top('goals')?<strong className="leader-name">{top('goals')}</strong>:<span className="summary-empty">Sem gols</span>}</div><div className="stat"><div className="stat-label"><Handshake size={18} aria-hidden="true"/> Garçom</div>{top('assists')?<strong className="leader-name">{top('assists')}</strong>:<span className="summary-empty">Sem assistências</span>}</div></div>
-          <section className="panel"><h3>Classificação dos times</h3><details className="inline-help"><summary>Como funciona a classificação</summary><p className="hint">Vitória: 3 pontos · Empate: 1 ponto. Resultados parciais contam durante o jogo. Desempate: saldo de gols e gols marcados. Empates restantes são compartilhados.</p><p className="hint">J: jogos · V: vitórias · E: empates · D: derrotas · GP: gols pró · GC: gols contra · SG: saldo.</p></details><div className="table-scroll" role="region" aria-label="Classificação dos times" tabIndex={0}><table><caption className="sr-only">Estatísticas dos times</caption><thead><tr>{['Time','PTS','J','V','E','D','GP','GC','SG'].map(h=><th key={h} scope="col">{h}</th>)}</tr></thead><tbody>{summary!.table.map(t=><tr key={t.id}><th scope="row">{t.name}</th>{[t.points,t.played,t.wins,t.draws,t.losses,t.goalsFor,t.goalsAgainst,t.balance].map((n,i)=><td key={i}>{n}</td>)}</tr>)}</tbody></table></div></section>
-          <section className="panel"><h3>Ranking dos jogadores</h3><div className="mode-buttons" aria-label="Ranking individual"><button aria-pressed={ranking==='goals'} className={ranking==='goals'?'active':''} onClick={()=>setRanking('goals')}>Gols</button><button aria-pressed={ranking==='assists'} className={ranking==='assists'?'active':''} onClick={()=>setRanking('assists')}>Assistências</button></div>{!(showAllRanking?ranked:ranked.filter(p=>p[ranking]>0)).length&&<p className="hint">Ainda não há {ranking==='goals'?'gols':'assistências'} registrados.</p>}{(showAllRanking?ranked:ranked.filter(p=>p[ranking]>0)).map(p=><div className="ranking-result" key={p.id}><span>{p.name}</span><strong>{p[ranking]} {ranking==='goals'?(p[ranking]===1?'gol':'gols'):(p[ranking]===1?'assistência':'assistências')}</strong></div>)}{ranked.some(p=>p[ranking]===0)&&<button className="button subtle full show-ranking" aria-expanded={showAllRanking} onClick={()=>setShowAllRanking(!showAllRanking)}>{showAllRanking?'Mostrar só quem pontuou':`Ver todos os ${ranked.length} jogadores`}</button>}</section>
-        </>:<section className="panel" aria-labelledby="public-teams-title"><h3 id="public-teams-title">Times da pelada</h3><div className="public-rosters">{data.teams.map((t,i)=><article className="public-team" data-team={i%4} key={t.id}><h4><span className="team-marker" data-team={i%4}><Users size={18} aria-hidden="true"/></span>{t.name}</h4><p>{t.playerIds.length} jogadores</p><ul>{t.playerIds.map(id=><li key={id}>{data.players.find(p=>p.id===id)?.name||'Jogador indisponível'}</li>)}</ul></article>)}</div></section>}
-      </>}
-      <footer className="public-footer"><p><Clock3 size={14} aria-hidden="true"/> Atualização automática a cada 12 segundos</p></footer>
+
+  return <div className="app">{confirmation}
+    <main key={tab} className="page tab-enter">
+      <TopBar brand title={title} subtitle={data?.date?`Pelada ${number}`:undefined} right={data&&status}/>
+      {error&&data&&<div className="notice error" role="alert"><TriangleAlert size={18} aria-hidden="true"/><span>Sem conexão. Tentando de novo a cada 12 segundos.</span></div>}
+      {body}
     </main>
+    {data&&teams.length>0&&<TabBar label="Página da pelada" value={tab} onChange={setTab} items={[
+      {value:'jogo',label:'Jogo',icon:<CircleDot size={22}/>},
+      {value:'times',label:'Times',icon:<Users size={22}/>},
+      {value:'resumo',label:'Resumo',icon:<Trophy size={22}/>}
+    ]}/>}
+    {sheets}{toast}
   </div>;
 }
