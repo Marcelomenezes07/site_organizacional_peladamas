@@ -1,12 +1,12 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {ArrowUpRight,ChevronRight,Download,LoaderCircle,MoreHorizontal,Send,Shuffle,Trash2,TriangleAlert} from 'lucide-react';
+import {ArrowRight,ChevronRight,Download,LoaderCircle,MoreHorizontal,Send,Shuffle,Trash2,TriangleAlert} from 'lucide-react';
 import type {Pelada} from '../../lib/models';
 import {formatStars,sortTeams,type DrawMode} from '../../lib/logic';
 import {DEFAULT_MATCH_MINUTES,teamLabel,type PublicPelada} from '../../lib/matches';
 import {peladaToCsv} from '../../lib/csv';
 import {getPelada,changePelada} from '../pelada-api';
 import {Sheet,Stepper,TeamDot,TopBar} from '../ui';
-import {downloadCsv,type Run} from './api';
+import {downloadCsv,organizerPeladaUrl,type Run} from './api';
 import SharePanel from './SharePanel';
 import {peladaTitle} from './PeladasList';
 
@@ -76,7 +76,7 @@ export default function PeladaScreen({number,pelada,openDraw,run,saving,show,ref
     const names=[...t.playerIds].sort((a,b)=>Number(b===t.leaderId)-Number(a===t.leaderId)).map(id=>info!.players.find(p=>p.id===id)?.name).filter(Boolean);
     return <li key={t.id}><TeamDot index={i%4}/><div><b>{teamLabel(t,info!.players)}</b><span>{names.join(', ')} · média {formatStars(avg)} ★</span></div></li>;
   })}</ul>;
-  const openPage=(primary:boolean)=><a className={'btn block '+(primary?'primary':'subtle')} href={`/pelada/${number}`} target="_blank" rel="noreferrer"><ArrowUpRight size={18} aria-hidden="true"/> Abrir página da pelada</a>;
+  const openPage=(primary:boolean)=><a className={'btn block '+(primary?'primary':'subtle')} href={organizerPeladaUrl(number)}>Abrir página da pelada <ArrowRight size={18} aria-hidden="true"/></a>;
 
   let step;
   if(!hasTeams)step=<section className="card" aria-label="Próximo passo"><span className="label">Próximo passo</span><p>Sorteie os times. A página da pelada é liberada logo depois.</p>

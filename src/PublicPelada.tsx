@@ -39,6 +39,8 @@ export default function PublicPeladaPage({number}:{number:number}){
   const [busy,setBusy]=useState(false);
   const [ranking,setRanking]=useState<'goals'|'assists'>('goals'),[showAll,setShowAll]=useState(false);
   const dataRef=useRef<PublicPelada|null>(null);
+  // Aberta pelo organizador (?org=1): mostra Voltar, porque o app instalado não tem o voltar do navegador.
+  const [fromOrganizer]=useState(()=>new URLSearchParams(window.location.search).has('org'));
 
   const refresh=useCallback(async():Promise<PublicPelada|null>=>{
     try{
@@ -262,7 +264,7 @@ export default function PublicPeladaPage({number}:{number:number}){
 
   return <div className="app">{confirmation}
     <main key={tab} className="page tab-enter">
-      <TopBar brand title={title} subtitle={data?.date?`Pelada ${number}`:undefined} right={data&&status}/>
+      <TopBar brand={!fromOrganizer} title={title} subtitle={data?.date?`Pelada ${number}`:undefined} right={data&&status} onBack={fromOrganizer?()=>window.location.assign(`/adm?pelada=${number}`):undefined}/>
       {error&&data&&<div className="notice error" role="alert"><TriangleAlert size={18} aria-hidden="true"/><span>Sem conexão. Tentando de novo a cada 12 segundos.</span></div>}
       {body}
     </main>

@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react';
-import {ArrowUpRight,Copy,RefreshCw} from 'lucide-react';
-import {copyText} from './api';
+import {ChevronRight,Copy,RefreshCw} from 'lucide-react';
+import {copyText,organizerPeladaUrl} from './api';
 
 /** Tudo o que vai para o grupo num lugar só: texto dos times, link e senha de exclusão. */
 export default function SharePanel({number,message,show}:{number:number;message:string|null;show:(text:string,error?:boolean)=>void}){
@@ -27,7 +27,7 @@ export default function SharePanel({number,message,show}:{number:number;message:
         {password?<button type="button" className="btn subtle small" aria-label="Copiar senha da pelada" onClick={async()=>{const ok=await copyText(password);show(ok?'Senha copiada.':'Selecione a senha exibida para copiar.',!ok);}}><span className="code">{password}</span><Copy size={16} aria-hidden="true"/></button>
         :passwordError?<button type="button" className="btn subtle small" onClick={()=>setRetry(n=>n+1)}><RefreshCw size={16} aria-hidden="true"/> Tentar de novo</button>
         :<span className="muted small">Carregando…</span>}</div>
-      <a className="row" href={`/pelada/${number}`} target="_blank" rel="noreferrer"><span className="row-main"><strong>Abrir página da pelada</strong><small>Abre numa nova aba</small></span><ArrowUpRight size={18} aria-hidden="true"/></a>
+      <a className="row" href={organizerPeladaUrl(number)}><span className="row-main"><strong>Abrir página da pelada</strong><small>A mesma página que os jogadores veem</small></span><ChevronRight className="chev" size={20} aria-hidden="true"/></a>
     </div>
     {passwordError&&<p className="error-text" role="alert">{passwordError}</p>}
   </>;

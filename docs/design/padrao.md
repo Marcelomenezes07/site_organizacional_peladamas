@@ -50,6 +50,7 @@ flowchart LR
 3. **Tarefas rápidas abrem num painel que sobe de baixo** (`Sheet`), por cima da tela atual: sortear, enviar, mudar tempo, marcar gol, nova partida, editar jogador, excluir. O painel fecha com X, Esc ou tocando fora.
 4. **Formulários longos usam a barra fixa de ação** (`ActionBar`) embaixo, no lugar das abas: Nova pelada e Editar partida.
 5. Ao trocar de tela, a página volta ao topo e o foco vai para o título.
+6. **Links internos abrem na mesma janela**, nunca em aba nova: no app instalado no celular, uma aba nova sai da tela cheia e mostra a barra do navegador. Como o app instalado não tem o botão voltar do navegador, toda página aberta a partir de outra precisa do próprio "Voltar". O organizador abre a página da pelada em `/pelada/N?org=1`, que mostra "Voltar" e retorna para `/adm?pelada=N`, a mesma pelada de onde saiu.
 
 ## 4. Regras de cada tela
 

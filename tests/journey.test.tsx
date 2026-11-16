@@ -78,3 +78,16 @@ it('changes the match time of a pelada',async()=>{
   await click('Pelada 1');await click('Tempo de cada partida');await click('Aumentar tempo de cada partida');await click('Salvar');
   expect(posts.at(-1)).toEqual({action:'setPeladaDuration',number:1,duration:11,etag:'v1'});
 });
+it('opens the pelada page in the same window and comes back to the same pelada',async()=>{
+  state={ranking:{players,etag:null},peladas:[{number:1,players,createdAt:'2026',etag:'v1',duration:10}]};
+  info={teams:[{id:'time-1',name:'Time 1',playerIds:['0','1'],leaderId:'0'},{id:'time-2',name:'Time 2',playerIds:['2','3'],leaderId:'2'}],matches:[],players:players.map(p=>({...p,goals:0,assists:0})),etag:'p2'};
+  await act(async()=>root.unmount());
+  window.history.pushState(null,'','/adm?pelada=1');
+  root=createRoot(host);await act(async()=>root.render(<App onLogout={async()=>{}}/>));
+  expect(window.location.pathname+window.location.search).toBe('/adm');
+  expect(document.querySelector('h1')?.textContent).toBe('Pelada 1');
+  const links=Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href^="/pelada/1"]'));
+  expect(links.length).toBeGreaterThan(0);
+  for(const a of links){expect(a.getAttribute('href')).toBe('/pelada/1?org=1');expect(a.target).toBe('');}
+  window.history.pushState(null,'','/');
+});

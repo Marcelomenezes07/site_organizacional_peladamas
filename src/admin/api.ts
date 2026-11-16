@@ -21,4 +21,7 @@ export async function copyText(text:string){
   }catch{return false;}
 }
 
+/** Página da pelada aberta pelo organizador: mesma janela (o app instalado não sai da tela cheia) e com "Voltar". */
+export const organizerPeladaUrl=(number:number)=>`/pelada/${number}?org=1`;
+
 export type Run=<T=unknown>(body:unknown,success?:string)=>Promise<T|null>;

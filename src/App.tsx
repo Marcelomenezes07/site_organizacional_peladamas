@@ -20,7 +20,9 @@ export default function App({onLogout}:{onLogout:()=>Promise<void>}){
   const [state,setState]=useState<AppState|null>(null);
   const [loading,setLoading]=useState(true),[loadError,setLoadError]=useState(''),[online,setOnline]=useState(true);
   const [tab,setTab]=useState<Tab>('peladas');
-  const [route,setRoute]=useState<Route>({name:'list'});
+  // Volta da página da pelada (/adm?pelada=N) direto para a pelada de onde o organizador saiu.
+  const [route,setRoute]=useState<Route>(()=>{const n=Number(new URLSearchParams(window.location.search).get('pelada'));return Number.isSafeInteger(n)&&n>0?{name:'pelada',number:n}:{name:'list'};});
+  useEffect(()=>{if(window.location.search)window.history.replaceState(null,'','/adm');},[]);
   const [motion,setMotion]=useState<'screen-enter'|'screen-back'|'tab-enter'>('tab-enter');
   const [saving,setSaving]=useState(false);
   const savingRef=useRef(false),refreshingRef=useRef(false),againRef=useRef(false),failuresRef=useRef(0),retryAtRef=useRef(0);
