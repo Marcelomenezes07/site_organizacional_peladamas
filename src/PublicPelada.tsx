@@ -7,15 +7,7 @@ import {useConfirmation} from './useConfirmation';
 import {ActionBar,Sheet,TabBar,TeamDot,TopBar,teamIndex,useToast} from './ui';
 import MatchClock from './public/MatchClock';
 import GoalSheet from './public/GoalSheet';
-
-// randomUUID exige HTTPS; getRandomValues também funciona na rede local por HTTP.
-function newMatchId(){
-  if(typeof crypto.randomUUID==='function')return crypto.randomUUID();
-  const bytes=crypto.getRandomValues(new Uint8Array(16));
-  bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
-  const hex=Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('');
-  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
-}
+import {newId as newMatchId} from './id';
 const withScore=(m:Match):Match=>({...m,homeScore:m.goals.filter(g=>g.teamId===m.homeId).length,awayScore:m.goals.filter(g=>g.teamId===m.awayId).length});
 /** Conteúdo que o placar mostra; o relógio fica de fora porque muda sem mexer nos gols. */
 const content=(m?:Match)=>m?JSON.stringify([m.homeId,m.awayId,m.goals]):'';

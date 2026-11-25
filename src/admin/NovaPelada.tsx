@@ -6,10 +6,11 @@ import {formatPeladaDay,todayLocal,validPeladaDate} from '../../lib/pelada-date'
 import {DEFAULT_MATCH_MINUTES} from '../../lib/matches';
 import {ActionBar,Sheet,Stepper,Switch,TopBar} from '../ui';
 import type {Run} from './api';
+import {newId} from '../id';
 
 /** `from` guarda o "novo" que foi associado a alguém do ranking, para poder desfazer. */
 type PreviewPlayer=Player&{unmatched?:boolean;original?:string;from?:PreviewPlayer};
-const nextId=()=>`u-${crypto.randomUUID()}`;
+const nextId=()=>`u-${newId()}`;
 const starsLabel=(n:number)=>`${formatStars(n)} ★`;
 
 export default function NovaPelada({state,run,saving,confirm,show,onCancel,onCreated}:{state:AppState;run:Run;saving:boolean;confirm:(text:string)=>Promise<boolean>;show:(text:string,error?:boolean)=>void;onCancel:()=>void;onCreated:(n:number)=>void}){

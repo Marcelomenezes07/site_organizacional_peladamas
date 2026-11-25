@@ -5,10 +5,11 @@ import {formatStars,normalize} from '../../lib/logic';
 import {rankingToCsv} from '../../lib/csv';
 import {TopBar} from '../ui';
 import {downloadCsv,type Run} from './api';
+import {newId} from '../id';
 import PlayerSheet,{type PlayerDraft} from './PlayerSheet';
 
 export const byStars=(a:Player,b:Player)=>b.stars-a.stars||a.name.localeCompare(b.name,'pt-BR');
-const nextId=()=>`u-${crypto.randomUUID()}`;
+const nextId=()=>`u-${newId()}`;
 
 /** Ranking geral: uma lista com busca. Tocar no jogador abre o painel de edição. */
 export default function RankingTab({state,run,saving,online,show}:{state:AppState;run:Run;saving:boolean;online:boolean;show:(text:string,error?:boolean)=>void}){

@@ -54,6 +54,16 @@ it('creates with the match time and the ranking switch, then waits for the new p
   expect(posts.at(-1)).toMatchObject({action:'createPelada',duration:11,addToRankingIds:[]});
   expect(document.body.textContent).toContain('Carregando a pelada');
 });
+it('reviews new names on a phone opening the dev server over http (no crypto.randomUUID)',async()=>{
+  const original=Object.getOwnPropertyDescriptor(crypto,'randomUUID');
+  Object.defineProperty(crypto,'randomUUID',{value:undefined,configurable:true});
+  try{
+    await click('Nova pelada');
+    await input(document.querySelector('#whatslist')!,'1. Alfa\n2. Beta\n3. Gama\n4. Delta');
+    await click('Revisar 4 jogadores');
+    expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(4);
+  }finally{if(original)Object.defineProperty(crypto,'randomUUID',original);else Reflect.deleteProperty(crypto,'randomUUID');}
+});
 it('links a new name to a ranking player by suggestion or search, and can undo',async()=>{
   state.ranking={players:[...players,{id:'p',name:'Paulo',aliases:'',stars:4}],etag:'r1'};
   await act(async()=>{document.dispatchEvent(new Event('visibilitychange'));});
