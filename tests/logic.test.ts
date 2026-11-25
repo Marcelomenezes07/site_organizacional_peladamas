@@ -1,5 +1,5 @@
 import { describe,it,expect } from 'vitest';
-import { parseWhatsAppList,matchPlayer,sortTeams,teamQuality,validStars } from '../lib/logic';
+import { parseWhatsAppList,matchPlayer,suggestPlayers,sortTeams,teamQuality,validStars } from '../lib/logic';
 import { rankingToCsv,peladaToCsv,readCsv } from '../lib/csv';
 import { starterPlayers } from '../lib/models';
 
@@ -16,6 +16,18 @@ describe('Listas de WhatsApp',()=>{
     expect(names).toEqual(['Jogador Á','Jogador 02','Jogador 08']);
     expect(names.map(n=>matchPlayer(n,starterPlayers)?.name)).toEqual(['Jogador Á','Jogador 02','Jogador 08']);
     expect(matchPlayer('Jogador\u200E 02',starterPlayers)?.name).toBe('Jogador 02');
+  });
+  it('sugere quem do ranking é o nome com uma palavra a mais ou a menos, nos dois sentidos',()=>{
+    const ranking=[{id:'1',name:'Paulo',aliases:'',stars:3},{id:'2',name:'Lucas',aliases:'',stars:3},{id:'3',name:'Godoy',aliases:'',stars:3},
+      {id:'4',name:'Thiago Saraiva',aliases:'',stars:3},{id:'5',name:'Paulo Silva',aliases:'',stars:3},{id:'6',name:'Roberto',aliases:'Bob Braz',stars:3}];
+    const names=(text:string)=>suggestPlayers(text,ranking).map(p=>p.name);
+    expect(names('Paulo Braz')).toEqual(['Paulo']);
+    // Lista com "Paulo" e dois Paulos no ranking: mostra os dois para quem organiza escolher.
+    expect(names('paulo')).toEqual(['Paulo','Paulo Silva']);
+    expect(names('Thiago')).toEqual(['Thiago Saraiva']);
+    expect(names('Bob')).toEqual(['Roberto']);
+    expect(names('Lucas Godoy')).toEqual(['Godoy','Lucas']);
+    expect(names('Pires')).toEqual([]);
   });
   it('em lista numerada ignora data, local e avisos do cabeçalho',()=>{
     // Formato real do grupo: dois tipos de ✅ (um com seletor de variação invisível) e cabeçalho sem número.

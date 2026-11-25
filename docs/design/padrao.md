@@ -56,6 +56,7 @@ flowchart LR
 
 - **Um botão verde por tela.** Os outros são cinza (`subtle`) ou texto. Na pelada, o botão verde muda conforme a etapa: *Sortear times* → *Enviar no grupo* → *Abrir página da pelada*.
 - **Toques em vez de menus suspensos.** Nomes e times aparecem como botões grandes (`.pick`). Números usam contador − e + (`Stepper`). Não use `<select>`.
+- **Nome da lista que não bate com o ranking:** na revisão da Nova pelada, o "novo" mostra sugestões "É Fulano?" (o ranking tem uma palavra a mais ou a menos; havendo vários, um botão para cada) e "Já está no ranking", que abre a busca. Ao associar, o nome da lista vira apelido do jogador e é reconhecido sozinho na próxima vez; "Desfazer" volta a ser novo.
 - **Listas inteiras, com busca quando forem longas.** Sem paginação e sem alternar lista/grade.
 - **Salvar na hora.** Cada jogador é salvo no próprio painel. Não existe "Salvar alterações" geral nem alteração pendente. A exceção é Editar partida, que é um rascunho até "Salvar partida", porque mexe em vários gols de uma vez.
 - **Ações raras ficam no menu ⋯**: baixar planilha, excluir pelada, sair.

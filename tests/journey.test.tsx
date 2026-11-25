@@ -54,6 +54,28 @@ it('creates with the match time and the ranking switch, then waits for the new p
   expect(posts.at(-1)).toMatchObject({action:'createPelada',duration:11,addToRankingIds:[]});
   expect(document.body.textContent).toContain('Carregando a pelada');
 });
+it('links a new name to a ranking player by suggestion or search, and can undo',async()=>{
+  state.ranking={players:[...players,{id:'p',name:'Paulo',aliases:'',stars:4}],etag:'r1'};
+  await act(async()=>{document.dispatchEvent(new Event('visibilitychange'));});
+  await click('Nova pelada');
+  await input(document.querySelector('#whatslist')!,'1. Jogador0\n2. Jogador1\n3. Jogador2\n4. Paulo Braz\n5. Jogador Três');
+  await click('Revisar 5 jogadores');
+  expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(2);
+  await click('É Paulo?');
+  expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(1);
+  expect(document.body.textContent).toContain('Na lista: Paulo Braz · vira apelido');
+  await click('Desfazer');
+  expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(2);
+  await click('É Paulo?');
+  // "Jogador Três" é o Jogador3, escolhido pela busca.
+  await click('Já está no ranking');
+  await input(document.querySelector<HTMLInputElement>('[aria-label="Buscar no ranking"]')!,'jogador3');
+  await click('Jogador3');
+  expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(0);
+  await click('Criar pelada com 5');
+  expect(posts.at(-1)).toMatchObject({action:'createPelada',aliasLinks:[{id:'p',alias:'Paulo Braz'},{id:'3',alias:'Jogador Três'}]});
+  expect((posts.at(-1)!.players as {id:string}[]).map(p=>p.id)).toEqual(['0','1','2','p','3']);
+});
 it('shows one main action per step: draw, then send to the group',async()=>{
   state={ranking:{players,etag:null},peladas:[{number:1,players,date:'2026-11-14',createdAt:'2026',etag:'v1',duration:10}]};
   await act(async()=>{document.dispatchEvent(new Event('visibilitychange'));});

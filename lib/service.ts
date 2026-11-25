@@ -4,7 +4,7 @@ import {readMatchState} from './public-pelada.js';
 import {validDuration} from './matches.js';
 import { readCsv, rankingToCsv, peladaToCsv } from './csv.js';
 import { starterPlayers, type AppState, type Pelada, type Player, type Ranking } from './models.js';
-import { validStars, normalize, matchPlayer } from './logic.js';
+import { validStars, normalize, matchPlayer, nameTaken, stripInvisible } from './logic.js';
 import { readDocument, listDocuments, createDocument, updateDocument, deleteDocument, ConflictError } from './storage.js';
 
 const rankPath='ranking_geral.csv';
@@ -64,6 +64,33 @@ async function addToRanking(players:Player[]):Promise<number>{
       if(current.etag)await updateDocument(rankPath,rankingToCsv(merged),current.etag);
       else await createDocument(rankPath,rankingToCsv(merged));
       return additions.length;
+    }catch(e){if(!(e instanceof ConflictError)||attempt===2)throw e;}
+  }
+  return 0;
+}
+type AliasLink={id:string;alias:string};
+/** Guarda o nome usado na lista como apelido do jogador associado, para ser reconhecido na próxima vez. */
+async function rememberAliases(links:AliasLink[]):Promise<number>{
+  if(!links.length)return 0;
+  for(let attempt=0;attempt<3;attempt++){
+    const current=await ranking();
+    let saved=0;
+    const next=current.players.map(p=>{
+      let aliases=p.aliases;
+      for(const link of links.filter(l=>l.id===p.id)){
+        const alias=stripInvisible(link.alias).replace(/\|/g,' ').replace(/\s+/g,' ').trim();
+        const candidate=aliases.trim()?`${aliases} | ${alias}`:alias;
+        // Não salva se o nome já é de alguém (inclusive um apelido salvo agora) ou se não cabe.
+        if(!alias||candidate.length>180||nameTaken(alias,current.players)||aliases.split('|').map(normalize).includes(normalize(alias)))continue;
+        aliases=candidate;saved++;
+      }
+      return aliases===p.aliases?p:{...p,aliases};
+    });
+    if(!saved)return 0;
+    try{
+      if(current.etag)await updateDocument(rankPath,rankingToCsv(next),current.etag);
+      else await createDocument(rankPath,rankingToCsv(next));
+      return saved;
     }catch(e){if(!(e instanceof ConflictError)||attempt===2)throw e;}
   }
   return 0;
@@ -145,6 +172,8 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
       if(players.length<4)throw new Error('A pelada precisa de pelo menos 4 jogadores.');
       const addIds=data.addToRankingIds??[];
       if(!Array.isArray(addIds)||addIds.some(id=>typeof id!=='string'||!players.some(p=>p.id===id)))return output(400,{error:'Jogadores inválidos para o ranking.'});
+      const links=data.aliasLinks??[];
+      if(!Array.isArray(links)||links.some(l=>!l||typeof l!=='object'||typeof l.id!=='string'||typeof l.alias!=='string'||!l.alias.trim()||l.alias.length>64||!players.some(p=>p.id===l.id)))return output(400,{error:'Apelidos inválidos.'});
       for(let i=0;i<6;i++){
         const ids=await usedPeladaNumbers();
         const number=Math.max(0,...ids)+1;
@@ -154,7 +183,10 @@ export async function handleApi(method:string, payload:unknown):Promise<ApiReply
           let addedToRanking=0;
           try{addedToRanking=await addToRanking(players.filter(p=>addIds.includes(p.id)));}
           catch(e){console.error('Erro ao adicionar jogadores ao Geral',e);return output(201,{ok:true,number,warning:'A pelada foi criada, mas não foi possível adicionar os novos jogadores ao Geral. Adicione-os pela aba Ranking.'});}
-          return output(201,{ok:true,number,addedToRanking});
+          let aliasesSaved=0;
+          try{aliasesSaved=await rememberAliases(links as AliasLink[]);}
+          catch(e){console.error('Erro ao salvar apelidos',e);return output(201,{ok:true,number,addedToRanking,warning:'A pelada foi criada, mas os apelidos não foram salvos. Adicione-os pela aba Ranking.'});}
+          return output(201,{ok:true,number,addedToRanking,aliasesSaved});
         }catch(e){if(!(e instanceof ConflictError))throw e;}
       }
       return output(409,{error:'Outra pelada foi criada ao mesmo tempo. Tente novamente.'});

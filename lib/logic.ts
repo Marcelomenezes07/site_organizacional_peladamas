@@ -39,6 +39,23 @@ export function matchPlayer(text: string, ranking: Player[]): Player | null {
   return matches.length===1?matches[0]:null;
 }
 
+/** Nome e apelidos de um jogador, já normalizados. */
+const namesOf=(p:Player)=>[p.name,...p.aliases.split('|')].map(normalize).filter(Boolean);
+/** Algum jogador do ranking já usa este nome ou apelido? */
+export const nameTaken=(text:string,ranking:Player[])=>{const name=normalize(text);return ranking.some(p=>namesOf(p).includes(name));};
+
+/**
+ * Sugere quem do ranking pode ser o nome da lista quando há uma palavra a mais ou a menos:
+ * "Paulo Braz" → "Paulo", e "Paulo" → "Paulo Braz" ou "Paulo Silva". Quem organiza escolhe.
+ */
+export function suggestPlayers(text:string, ranking:Player[], max=4):Player[]{
+  const name=normalize(text);
+  if(!name)return [];
+  const words=name.split(' ');
+  return ranking.filter(p=>namesOf(p).some(a=>words.includes(a)||a.split(' ').includes(name)||name.startsWith(a+' ')||a.startsWith(name+' ')))
+    .sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).slice(0,max);
+}
+
 export type Team = Player[];
 export type DrawMode = 'balanced' | 'tiers' | 'balanced-five-stars';
 export function teamQuality(teams: Team[], mode:DrawMode='balanced'): number {

@@ -1,13 +1,14 @@
 import {useState} from 'react';
-import {ArrowRight,Check,LoaderCircle,X} from 'lucide-react';
+import {ArrowRight,Check,LoaderCircle,Search,X} from 'lucide-react';
 import type {AppState,Player} from '../../lib/models';
-import {formatStars,matchPlayer,normalize,parseWhatsAppList} from '../../lib/logic';
+import {formatStars,matchPlayer,normalize,parseWhatsAppList,suggestPlayers} from '../../lib/logic';
 import {formatPeladaDay,todayLocal,validPeladaDate} from '../../lib/pelada-date';
 import {DEFAULT_MATCH_MINUTES} from '../../lib/matches';
-import {ActionBar,Stepper,Switch,TopBar} from '../ui';
+import {ActionBar,Sheet,Stepper,Switch,TopBar} from '../ui';
 import type {Run} from './api';
 
-type PreviewPlayer=Player&{unmatched?:boolean;original?:string};
+/** `from` guarda o "novo" que foi associado a alguém do ranking, para poder desfazer. */
+type PreviewPlayer=Player&{unmatched?:boolean;original?:string;from?:PreviewPlayer};
 const nextId=()=>`u-${crypto.randomUUID()}`;
 const starsLabel=(n:number)=>`${formatStars(n)} ★`;
 
@@ -35,18 +36,30 @@ export default function NovaPelada({state,run,saving,confirm,show,onCancel,onCre
   const cancel=async()=>{if(listText.trim()&&!await confirm('Sair sem criar a pelada? A lista colada será perdida.'))return;onCancel();};
   const update=(id:string,change:Partial<PreviewPlayer>)=>setPreview(list=>list.map(p=>p.id===id?{...p,...change}:p));
   const remove=(id:string)=>setPreview(list=>list.filter(p=>p.id!==id));
+  const [linking,setLinking]=useState<PreviewPlayer|null>(null),[query,setQuery]=useState('');
+  const link=(newcomer:PreviewPlayer,player:Player)=>{
+    setPreview(list=>list.map(p=>p.id===newcomer.id?{...player,original:newcomer.original??newcomer.name,from:newcomer}:p));
+    setLinking(null);show(`${newcomer.original??newcomer.name} associado a ${player.name}.`);
+  };
+  const unlink=(p:PreviewPlayer)=>{const from=p.from;if(from)setPreview(list=>list.map(x=>x.id===p.id?from:x));};
 
   const newcomers=preview.filter(p=>p.unmatched),known=preview.filter(p=>!p.unmatched);
+  // Só oferece quem do ranking ainda não está nesta pelada.
+  const available=state.ranking.players.filter(r=>!preview.some(p=>p.id===r.id));
+  const suggestions=(p:PreviewPlayer)=>suggestPlayers(p.original??p.name,available);
+  const q=normalize(query);
+  const options=[...available].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).filter(r=>normalize(`${r.name} ${r.aliases}`).includes(q));
   const names=preview.map(p=>normalize(p.name));
   const problem=preview.length<4?'A pelada precisa de pelo menos 4 jogadores.':preview.some(p=>!p.name.trim())?'Preencha o nome de todos os novos.':new Set(names).size!==names.length?'Há nomes repetidos na lista.':'';
 
   const create=async()=>{
     if(problem||saving)return;
-    const answer=await run<{number:number;addedToRanking?:number;warning?:string}>({action:'createPelada',date,duration,
-      players:preview.map(({id,name,aliases,stars})=>({id,name:name.trim(),aliases,stars})),addToRankingIds:addNew?newcomers.map(p=>p.id):[]});
+    const answer=await run<{number:number;addedToRanking?:number;aliasesSaved?:number;warning?:string}>({action:'createPelada',date,duration,
+      players:preview.map(({id,name,aliases,stars})=>({id,name:name.trim(),aliases,stars})),addToRankingIds:addNew?newcomers.map(p=>p.id):[],
+      aliasLinks:preview.filter(p=>p.from&&p.original).map(p=>({id:p.id,alias:p.original!}))});
     if(!answer)return;
     if(answer.warning)show(answer.warning,true);
-    else show(`Pelada ${answer.number} criada${answer.addedToRanking?` · ${answer.addedToRanking} ${answer.addedToRanking===1?'novo jogador entrou':'novos jogadores entraram'} no ranking`:''}.`);
+    else show(`Pelada ${answer.number} criada${answer.addedToRanking?` · ${answer.addedToRanking} ${answer.addedToRanking===1?'novo jogador entrou':'novos jogadores entraram'} no ranking`:''}${answer.aliasesSaved?` · ${answer.aliasesSaved} ${answer.aliasesSaved===1?'apelido salvo':'apelidos salvos'}`:''}.`);
     onCreated(answer.number);
   };
 
@@ -72,14 +85,16 @@ export default function NovaPelada({state,run,saving,confirm,show,onCancel,onCre
         <div className="newcomer-top"><input aria-label="Nome do convocado" value={p.name} maxLength={55} onChange={e=>update(p.id,{name:e.target.value})}/>
           <button type="button" className="icon-btn" aria-label={`Remover ${p.name} da lista`} onClick={()=>remove(p.id)}><X size={20} aria-hidden="true"/></button></div>
         <div className="kv"><span className="muted small">Nota</span><Stepper label={`Nota de ${p.name||'novo jogador'}`} value={p.stars} min={0.5} max={5} step={0.5} format={starsLabel} onChange={n=>update(p.id,{stars:n})}/></div>
+        {available.length>0&&<div className="link-row">{suggestions(p).map(s=><button key={s.id} type="button" className="btn subtle small" onClick={()=>link(p,s)}>É {s.name}?</button>)}
+          <button type="button" className="btn text small" onClick={()=>{setQuery('');setLinking(p);}}>Já está no ranking</button></div>}
       </div>)}</div>
       <div className="card"><Switch checked={addNew} onChange={setAddNew} title="Adicionar os novos ao ranking" detail="Assim eles são reconhecidos nas próximas peladas."/></div>
     </>}
     {known.length>0&&<>
       <h2 className="label">{known.length} já {known.length===1?'está':'estão'} no ranking</h2>
       <div className="list">{known.map(p=><div key={p.id} className="row">
-        <span className="row-main"><strong>{p.name}</strong>{p.original&&normalize(p.original)!==normalize(p.name)&&<small>Na lista: {p.original}</small>}</span>
-        <span className="stars">{starsLabel(p.stars)}</span>
+        <span className="row-main"><strong>{p.name}</strong>{p.original&&normalize(p.original)!==normalize(p.name)&&<small className="wrap">Na lista: {p.original}{p.from&&' · vira apelido'}</small>}</span>
+        {p.from?<button type="button" className="btn text small" onClick={()=>unlink(p)}>Desfazer</button>:<span className="stars">{starsLabel(p.stars)}</span>}
         <button type="button" className="icon-btn" aria-label={`Remover ${p.name} da lista`} onClick={()=>remove(p.id)}><X size={20} aria-hidden="true"/></button>
       </div>)}</div>
     </>}
@@ -88,5 +103,10 @@ export default function NovaPelada({state,run,saving,confirm,show,onCancel,onCre
       <button type="button" className="btn primary block" disabled={!!problem||saving} onClick={()=>void create()}>
         {saving?<LoaderCircle className="spin" size={18} aria-hidden="true"/>:<Check size={18} aria-hidden="true"/>} Criar pelada com {preview.length}</button>
     </ActionBar>
+    <Sheet open={!!linking} title={`Quem é ${linking?.original??linking?.name??''}?`} subtitle="O nome da lista fica salvo como apelido e será reconhecido na próxima vez." onClose={()=>setLinking(null)}>
+      <div className="search"><Search size={18} aria-hidden="true"/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar no ranking" aria-label="Buscar no ranking"/></div>
+      {options.length?<div className="pick">{options.map(r=><button key={r.id} type="button" onClick={()=>linking&&link(linking,r)}>{r.name}</button>)}</div>
+        :<p className="muted">Ninguém do ranking com esse nome. Se for alguém novo, feche e confira a nota.</p>}
+    </Sheet>
   </main>;
 }

@@ -56,6 +56,23 @@ describe('Inclusão em lote no Geral',()=>{
     }finally{log.mockRestore();}
   });
 });
+describe('Apelidos de quem foi associado na revisão',()=>{
+  const ranking=[{id:'p1',name:'Paulo',aliases:'',stars:4},{id:'p2',name:'Ana',aliases:'Aninha',stars:3},{id:'p3',name:'Caio',aliases:'',stars:3},{id:'p4',name:'Duda',aliases:'',stars:3}];
+  beforeEach(()=>{memory.docs.set('ranking_geral.csv',{content:rankingToCsv(ranking),etag:'r1'});});
+  it('salva o nome da lista como apelido, sem repetir e sem mexer na nota',async()=>{
+    const reply=await handleApi('POST',{action:'createPelada',players:ranking,aliasLinks:[{id:'p1',alias:'Paulo Braz'},{id:'p2',alias:'aninha'},{id:'p3',alias:'Duda'}]});
+    expect(reply.status).toBe(201);
+    // "aninha" já era apelido da Ana; "Duda" é nome de outro jogador.
+    expect(reply.value.aliasesSaved).toBe(1);
+    const saved=readCsv(memory.docs.get('ranking_geral.csv')!.content).players;
+    expect(saved.find(p=>p.id==='p1')).toEqual({id:'p1',name:'Paulo',aliases:'Paulo Braz',stars:4});
+    expect(saved.find(p=>p.id==='p2')!.aliases).toBe('Aninha');
+    expect(saved.find(p=>p.id==='p3')!.aliases).toBe('');
+  });
+  it('rejeita apelido para quem não está na pelada',async()=>{
+    expect((await handleApi('POST',{action:'createPelada',players:ranking,aliasLinks:[{id:'outro',alias:'X'}]})).status).toBe(400);
+  });
+});
 describe('Excluir pelada',()=>{
   it('remove apenas o histórico selecionado e não reutiliza seu número',async()=>{
     await handleApi('POST',{action:'createPelada',players,addToRankingIds:[newcomer.id]});
