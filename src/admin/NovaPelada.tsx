@@ -1,11 +1,12 @@
 import {useState} from 'react';
-import {ArrowRight,Check,LoaderCircle,Search,X} from 'lucide-react';
+import {ArrowRight,Check,ChevronRight,LoaderCircle,X} from 'lucide-react';
 import type {AppState,Player} from '../../lib/models';
 import {formatStars,matchPlayer,normalize,parseWhatsAppList,suggestPlayers} from '../../lib/logic';
 import {formatPeladaDay,todayLocal,validPeladaDate} from '../../lib/pelada-date';
 import {DEFAULT_MATCH_MINUTES} from '../../lib/matches';
-import {ActionBar,Sheet,Stepper,Switch,TopBar} from '../ui';
+import {ActionBar,Stepper,Switch,TopBar} from '../ui';
 import type {Run} from './api';
+import ListNameSheet from './ListNameSheet';
 import {newId} from '../id';
 
 /** `from` guarda o "novo" que foi associado a alguém do ranking, para poder desfazer. */
@@ -35,21 +36,26 @@ export default function NovaPelada({state,run,saving,confirm,show,onCancel,onCre
     setPreview(result);move(2);
   };
   const cancel=async()=>{if(listText.trim()&&!await confirm('Sair sem criar a pelada? A lista colada será perdida.'))return;onCancel();};
-  const update=(id:string,change:Partial<PreviewPlayer>)=>setPreview(list=>list.map(p=>p.id===id?{...p,...change}:p));
   const remove=(id:string)=>setPreview(list=>list.filter(p=>p.id!==id));
-  const [linking,setLinking]=useState<PreviewPlayer|null>(null),[query,setQuery]=useState('');
-  const link=(newcomer:PreviewPlayer,player:Player)=>{
-    setPreview(list=>list.map(p=>p.id===newcomer.id?{...player,original:newcomer.original??newcomer.name,from:newcomer}:p));
-    setLinking(null);show(`${newcomer.original??newcomer.name} associado a ${player.name}.`);
+  // Nome da lista aberto no painel (novo ou já associado a alguém do ranking).
+  const [editing,setEditing]=useState<string|null>(null);
+  const entry=preview.find(p=>p.id===editing)??null;
+  const replace=(id:string,next:PreviewPlayer)=>setPreview(list=>list.map(p=>p.id===id?next:p));
+  const link=(item:PreviewPlayer,player:Player)=>{
+    const newcomer=item.from??item;
+    replace(item.id,{...player,original:newcomer.original??newcomer.name,from:newcomer});
+    setEditing(null);show(`${newcomer.original??newcomer.name} associado a ${player.name}.`);
   };
-  const unlink=(p:PreviewPlayer)=>{const from=p.from;if(from)setPreview(list=>list.map(x=>x.id===p.id?from:x));};
+  const keepNew=(item:PreviewPlayer,draft:Pick<Player,'name'|'stars'>)=>{replace(item.id,{...(item.from??item),...draft,unmatched:true});setEditing(null);};
 
   const newcomers=preview.filter(p=>p.unmatched),known=preview.filter(p=>!p.unmatched);
   // Só oferece quem do ranking ainda não está nesta pelada.
   const available=state.ranking.players.filter(r=>!preview.some(p=>p.id===r.id));
-  const suggestions=(p:PreviewPlayer)=>suggestPlayers(p.original??p.name,available);
-  const q=normalize(query);
-  const options=[...available].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).filter(r=>normalize(`${r.name} ${r.aliases}`).includes(q));
+  const hint=(p:PreviewPlayer)=>{
+    if(p.original&&normalize(p.original)!==normalize(p.name))return `Na lista: ${p.original}`;
+    const names=suggestPlayers(p.original??p.name,available).map(s=>s.name);
+    return names.length?`Talvez seja ${names.length===1?names[0]:`${names.slice(0,-1).join(', ')} ou ${names.at(-1)}`}`:'';
+  };
   const names=preview.map(p=>normalize(p.name));
   const problem=preview.length<4?'A pelada precisa de pelo menos 4 jogadores.':preview.some(p=>!p.name.trim())?'Preencha o nome de todos os novos.':new Set(names).size!==names.length?'Há nomes repetidos na lista.':'';
 
@@ -81,33 +87,30 @@ export default function NovaPelada({state,run,saving,confirm,show,onCancel,onCre
     <TopBar title="Revisar jogadores" subtitle={`Etapa 2 de 2 · ${formatPeladaDay(date)} · partidas de ${duration} min`} onBack={()=>move(1)}/>
     <div className="progress" aria-hidden="true"><span style={{width:'100%'}}/></div>
     {newcomers.length>0&&<>
-      <h2 className="label">{newcomers.length} {newcomers.length===1?'novo · confira a nota':'novos · confira as notas'}</h2>
-      <div className="list">{newcomers.map(p=><div key={p.id} className="row newcomer">
-        <div className="newcomer-top"><input aria-label="Nome do convocado" value={p.name} maxLength={55} onChange={e=>update(p.id,{name:e.target.value})}/>
-          <button type="button" className="icon-btn" aria-label={`Remover ${p.name} da lista`} onClick={()=>remove(p.id)}><X size={20} aria-hidden="true"/></button></div>
-        <div className="kv"><span className="muted small">Nota</span><Stepper label={`Nota de ${p.name||'novo jogador'}`} value={p.stars} min={0.5} max={5} step={0.5} format={starsLabel} onChange={n=>update(p.id,{stars:n})}/></div>
-        {available.length>0&&<div className="link-row">{suggestions(p).map(s=><button key={s.id} type="button" className="btn subtle small" onClick={()=>link(p,s)}>É {s.name}?</button>)}
-          <button type="button" className="btn text small" onClick={()=>{setQuery('');setLinking(p);}}>Já está no ranking</button></div>}
-      </div>)}</div>
+      <h2 className="label">{newcomers.length} {newcomers.length===1?'novo':'novos'} · toque para conferir</h2>
+      <div className="list">{newcomers.map(p=>{const h=hint(p);return <button key={p.id} type="button" className="row newcomer" onClick={()=>setEditing(p.id)}>
+        <span className="row-main"><strong>{p.name}</strong>{h&&<small className="wrap">{h}</small>}</span>
+        <span className="stars">{starsLabel(p.stars)}</span><ChevronRight className="chev" size={20} aria-hidden="true"/>
+      </button>;})}</div>
       <div className="card"><Switch checked={addNew} onChange={setAddNew} title="Adicionar os novos ao ranking" detail="Assim eles são reconhecidos nas próximas peladas."/></div>
     </>}
     {known.length>0&&<>
       <h2 className="label">{known.length} já {known.length===1?'está':'estão'} no ranking</h2>
-      <div className="list">{known.map(p=><div key={p.id} className="row">
-        <span className="row-main"><strong>{p.name}</strong>{p.original&&normalize(p.original)!==normalize(p.name)&&<small className="wrap">Na lista: {p.original}{p.from&&' · vira apelido'}</small>}</span>
-        {p.from?<button type="button" className="btn text small" onClick={()=>unlink(p)}>Desfazer</button>:<span className="stars">{starsLabel(p.stars)}</span>}
-        <button type="button" className="icon-btn" aria-label={`Remover ${p.name} da lista`} onClick={()=>remove(p.id)}><X size={20} aria-hidden="true"/></button>
-      </div>)}</div>
+      <div className="list">{known.map(p=>{
+        const main=<span className="row-main"><strong>{p.name}</strong>{p.original&&normalize(p.original)!==normalize(p.name)&&<small className="wrap">Na lista: {p.original}{p.from&&' · vira apelido'}</small>}</span>;
+        // Associado nesta revisão: toque para trocar ou voltar a ser novo.
+        return p.from?<button key={p.id} type="button" className="row" onClick={()=>setEditing(p.id)}>{main}<span className="stars">{starsLabel(p.stars)}</span><ChevronRight className="chev" size={20} aria-hidden="true"/></button>
+          :<div key={p.id} className="row">{main}<span className="stars">{starsLabel(p.stars)}</span>
+            <button type="button" className="icon-btn" aria-label={`Remover ${p.name} da lista`} onClick={()=>remove(p.id)}><X size={20} aria-hidden="true"/></button></div>;
+      })}</div>
     </>}
     <ActionBar>
       {problem&&<p className="error-text" role="alert">{problem}</p>}
       <button type="button" className="btn primary block" disabled={!!problem||saving} onClick={()=>void create()}>
         {saving?<LoaderCircle className="spin" size={18} aria-hidden="true"/>:<Check size={18} aria-hidden="true"/>} Criar pelada com {preview.length}</button>
     </ActionBar>
-    <Sheet open={!!linking} title={`Quem é ${linking?.original??linking?.name??''}?`} subtitle="O nome da lista fica salvo como apelido e será reconhecido na próxima vez." onClose={()=>setLinking(null)}>
-      <div className="search"><Search size={18} aria-hidden="true"/><input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar no ranking" aria-label="Buscar no ranking"/></div>
-      {options.length?<div className="pick">{options.map(r=><button key={r.id} type="button" onClick={()=>linking&&link(linking,r)}>{r.name}</button>)}</div>
-        :<p className="muted">Ninguém do ranking com esse nome. Se for alguém novo, feche e confira a nota.</p>}
-    </Sheet>
+    {entry&&<ListNameSheet key={entry.id} open listName={entry.original??(entry.from??entry).name} newcomer={entry.from??entry}
+      linked={entry.from?entry:null} available={available}
+      onLink={player=>link(entry,player)} onNew={draft=>keepNew(entry,draft)} onRemove={()=>{remove(entry.id);setEditing(null);}} onClose={()=>setEditing(null)}/>}
   </main>;
 }

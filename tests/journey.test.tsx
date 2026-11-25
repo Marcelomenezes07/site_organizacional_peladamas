@@ -9,6 +9,8 @@ const posts:Record<string,unknown>[]=[];
 const button=(name:string)=>Array.from(document.querySelectorAll('button')).find(b=>b.getAttribute('aria-label')===name||b.textContent?.trim()===name||b.textContent?.trim().startsWith(name));
 const click=async(name:string)=>{const b=button(name);expect(b,name).toBeTruthy();await act(async()=>b!.click());};
 const input=async(el:HTMLInputElement|HTMLTextAreaElement,value:string)=>{await act(async()=>{Object.getOwnPropertyDescriptor(el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value')!.set!.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));});};
+const newcomers=()=>Array.from(document.querySelectorAll<HTMLButtonElement>('.row.newcomer'));
+const inSheet=async(name:string)=>{const b=Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find(b=>b.textContent?.trim()===name);expect(b,name).toBeTruthy();await act(async()=>b!.click());};
 const players=Array.from({length:4},(_,i)=>({id:String(i),name:`Jogador${i}`,aliases:'',stars:3}));
 beforeEach(async()=>{
   Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});vi.stubGlobal('scrollTo',()=>{});
@@ -31,11 +33,17 @@ it('starts on Peladas with bottom tabs and keeps the review when going back to t
   await input(document.querySelector('#whatslist')!,'Peladamas quarta 21h\n1. Alfa\n2. Beta\n3. Gama\n4. Delta\n5. Epsilon\n6. Zeta\n7. Eta');
   await click('Revisar 7 jogadores');
   expect(document.querySelector('#whatslist')).toBeNull();
-  const names=document.querySelectorAll<HTMLInputElement>('[aria-label="Nome do convocado"]');expect(names).toHaveLength(7);
-  await input(names[0],'Alfa corrigido');
+  expect(newcomers()).toHaveLength(7);
+  await click('Alfa');
+  await input(document.querySelector<HTMLInputElement>('#newcomer-name')!,'Alfa corrigido');
+  await inSheet('Confirmar novo');
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
   await click('Voltar');expect((document.querySelector('#whatslist') as HTMLTextAreaElement).value).toContain('Alfa');
   await click('Revisar 7 jogadores');
-  expect(document.querySelector<HTMLInputElement>('[aria-label="Nome do convocado"]')!.value).toBe('Alfa corrigido');
+  expect(newcomers()[0].textContent).toContain('Alfa corrigido');
+  expect(newcomers()[0].textContent).toContain('Na lista: Alfa');
+  await click('Beta');await inSheet('Tirar da lista');
+  expect(newcomers()).toHaveLength(6);
 });
 it('does not advance with fewer than four names',async()=>{
   await click('Nova pelada');await input(document.querySelector('#whatslist')!,'1. Alfa\n2. Beta');await click('Revisar jogadores');
@@ -48,7 +56,7 @@ it('creates with the match time and the ranking switch, then waits for the new p
   await click('Aumentar tempo de cada partida');
   await input(document.querySelector('#whatslist')!,'1. Jogador0\n2. Jogador1\n3. Jogador2\n4. Novo');
   await click('Revisar 4 jogadores');
-  expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(1);
+  expect(newcomers()).toHaveLength(1);
   await click('Adicionar os novos ao ranking');
   await click('Criar pelada com 4');
   expect(posts.at(-1)).toMatchObject({action:'createPelada',duration:11,addToRankingIds:[]});
@@ -61,7 +69,7 @@ it('reviews new names on a phone opening the dev server over http (no crypto.ran
     await click('Nova pelada');
     await input(document.querySelector('#whatslist')!,'1. Alfa\n2. Beta\n3. Gama\n4. Delta');
     await click('Revisar 4 jogadores');
-    expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(4);
+    expect(newcomers()).toHaveLength(4);
   }finally{if(original)Object.defineProperty(crypto,'randomUUID',original);else Reflect.deleteProperty(crypto,'randomUUID');}
 });
 it('links a new name to a ranking player by suggestion or search, and can undo',async()=>{
@@ -70,18 +78,23 @@ it('links a new name to a ranking player by suggestion or search, and can undo',
   await click('Nova pelada');
   await input(document.querySelector('#whatslist')!,'1. Jogador0\n2. Jogador1\n3. Jogador2\n4. Paulo Braz\n5. Jogador Três');
   await click('Revisar 5 jogadores');
-  expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(2);
-  await click('É Paulo?');
-  expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(1);
+  expect(newcomers()).toHaveLength(2);
+  expect(newcomers()[0].textContent).toContain('Talvez seja Paulo');
+  await click('Paulo Braz');await inSheet('Paulo');
+  expect(newcomers()).toHaveLength(1);
   expect(document.body.textContent).toContain('Na lista: Paulo Braz · vira apelido');
-  await click('Desfazer');
-  expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(2);
-  await click('É Paulo?');
-  // "Jogador Três" é o Jogador3, escolhido pela busca.
-  await click('Já está no ranking');
+  // Tocar no associado reabre o painel com ele marcado; "Confirmar novo" desfaz.
+  await click('Paulo');
+  expect(document.querySelector('[role="dialog"] [aria-pressed="true"]')?.textContent).toBe('Paulo');
+  await inSheet('Confirmar novo');
+  expect(newcomers()).toHaveLength(2);
+  await click('Paulo Braz');await inSheet('Paulo');
+  // "Jogador Três" não tem sugestão: o Jogador3 é escolhido pela busca.
+  await click('Jogador Três');
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Sem sugestões');
   await input(document.querySelector<HTMLInputElement>('[aria-label="Buscar no ranking"]')!,'jogador3');
-  await click('Jogador3');
-  expect(document.querySelectorAll('[aria-label="Nome do convocado"]')).toHaveLength(0);
+  await inSheet('Jogador3');
+  expect(newcomers()).toHaveLength(0);
   await click('Criar pelada com 5');
   expect(posts.at(-1)).toMatchObject({action:'createPelada',aliasLinks:[{id:'p',alias:'Paulo Braz'},{id:'3',alias:'Jogador Três'}]});
   expect((posts.at(-1)!.players as {id:string}[]).map(p=>p.id)).toEqual(['0','1','2','p','3']);
