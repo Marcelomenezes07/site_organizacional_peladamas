@@ -17,6 +17,13 @@ describe('Listas de WhatsApp',()=>{
     expect(names.map(n=>matchPlayer(n,starterPlayers)?.name)).toEqual(['Jogador Á','Jogador 02','Jogador 08']);
     expect(matchPlayer('Jogador\u200E 02',starterPlayers)?.name).toBe('Jogador 02');
   });
+  it('em lista numerada ignora data, local e avisos do cabeçalho',()=>{
+    // Formato real do grupo: dois tipos de ✅ (um com seletor de variação invisível) e cabeçalho sem número.
+    const pasted=['Peladamas','','\u{1F5D3}\uFE0F 25/11 - 21h - 23h','\u{1F4CD}Quadra Central','','R$20,00','PIX: 000','',
+      '*Se não pagar até 18h30 do dia, entra alguém na espera*','','1. Jogador Á\u2705','2. Jogador 02 \u2705\uFE0F','3. Jogador 08 ','4. Novato\u2705\uFE0F'].join('\n');
+    expect(parseWhatsAppList(pasted)).toEqual(['Jogador Á','Jogador 02','Jogador 08','Novato']);
+    expect(parseWhatsAppList('Ana\nBia\nCaio')).toEqual(['Ana','Bia','Caio']);
+  });
 });
 describe('CSV e estrelas',()=>{
   it('preserva pontuação e aspas',()=>{

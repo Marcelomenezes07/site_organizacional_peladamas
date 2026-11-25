@@ -7,15 +7,22 @@ export const formatStars = (value: number) => value.toLocaleString('pt-BR', {max
 export const validStars = (v: number) => Number.isFinite(v) && v>=0.5 && v<=5 && Number.isInteger(v*2);
 export const starOptions = Array.from({length:10},(_,i)=>(i+1)/2);
 
+const numbered=/^(?:(?:\d\uFE0F?\u20E3)+\s*|\d{1,3}\s*[.)\-:]\s*)/u;
+const waitingList=/^\s*(espera|lista de espera|reservas|suplentes)\s*:/i;
+
 export function parseWhatsAppList(input: string): string[] {
   const result:string[]=[];
-  for (const raw of input.split(/\r?\n/)) {
-    let s=stripInvisible(raw).replace(/\s+/g,' ').trim();
-    if (/^\s*(espera|lista de espera|reservas|suplentes)\s*:/i.test(s)) break;
+  const lines=input.split(/\r?\n/).map(raw=>stripInvisible(raw).replace(/\s+/g,' ').trim());
+  const end=lines.findIndex(s=>waitingList.test(s));
+  // Se a lista é numerada, só as linhas numeradas são jogadores: data, local e avisos do cabeçalho ficam de fora.
+  const onlyNumbered=lines.slice(0,end<0?undefined:end).filter(s=>numbered.test(s)).length>=2;
+  for (let s of lines) {
+    if (waitingList.test(s)) break;
+    if (onlyNumbered&&!numbered.test(s)) continue;
     if (!s || /^(pix|valor|r\$|quadra|data|hora|local|pelada(?:mas|s)?|total|confirmados|pagos)\b/i.test(s)) continue;
     // Descarta prefácio textual de WhatsApp; aceita itens numerados ou linhas de nomes puros.
     // Também aceita números em emoji (teclas 1, 2, 3...) e o "~" que o WhatsApp põe em quem não está nos contatos.
-    s=s.replace(/^\s*(?:(?:\d\uFE0F?\u20E3)+\s*|\d{1,3}\s*[.)\-:]\s*|[•*-]\s*)/u,'');
+    s=s.replace(numbered,'').replace(/^[•*-]\s*/,'');
     s=s.replace(/[\p{Extended_Pictographic}\uFE0F\u20E3✔☑☒✖]+/gu,'').trim();
     s=s.replace(/^[~@]\s*/,'').replace(/\s*\((?:pago|confirmado|pendente)\)\s*$/i,'').trim();
     if (!s || /^\d+$/.test(s) || /^https?:\/\//i.test(s) || /[:=]/.test(s)) continue;
