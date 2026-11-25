@@ -1,6 +1,8 @@
 import type { Player } from './models.js';
 
-export const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim().replace(/\s+/g,' ');
+/** Remove caracteres invisíveis que o WhatsApp põe no texto copiado (direção do texto, espaço de largura zero). */
+export const stripInvisible = (s: string) => s.replace(/\p{Cf}/gu,'');
+export const normalize = (s: string) => stripInvisible(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim().replace(/\s+/g,' ');
 export const formatStars = (value: number) => value.toLocaleString('pt-BR', {maximumFractionDigits:1});
 export const validStars = (v: number) => Number.isFinite(v) && v>=0.5 && v<=5 && Number.isInteger(v*2);
 export const starOptions = Array.from({length:10},(_,i)=>(i+1)/2);
@@ -8,13 +10,14 @@ export const starOptions = Array.from({length:10},(_,i)=>(i+1)/2);
 export function parseWhatsAppList(input: string): string[] {
   const result:string[]=[];
   for (const raw of input.split(/\r?\n/)) {
-    let s=raw.trim();
+    let s=stripInvisible(raw).replace(/\s+/g,' ').trim();
     if (/^\s*(espera|lista de espera|reservas|suplentes)\s*:/i.test(s)) break;
     if (!s || /^(pix|valor|r\$|quadra|data|hora|local|pelada(?:mas|s)?|total|confirmados|pagos)\b/i.test(s)) continue;
     // Descarta prefácio textual de WhatsApp; aceita itens numerados ou linhas de nomes puros.
-    s=s.replace(/^\s*(?:\d{1,3}\s*[.)\-:]\s*|[•*-]\s*)/,'');
-    s=s.replace(/[✅✔☑☒⚽⭐🌟🔥💪❌✖]+/gu,'').trim();
-    s=s.replace(/^@/,'').replace(/\s*\((?:pago|confirmado|pendente)\)\s*$/i,'').trim();
+    // Também aceita números em emoji (teclas 1, 2, 3...) e o "~" que o WhatsApp põe em quem não está nos contatos.
+    s=s.replace(/^\s*(?:(?:\d\uFE0F?\u20E3)+\s*|\d{1,3}\s*[.)\-:]\s*|[•*-]\s*)/u,'');
+    s=s.replace(/[\p{Extended_Pictographic}\uFE0F\u20E3✔☑☒✖]+/gu,'').trim();
+    s=s.replace(/^[~@]\s*/,'').replace(/\s*\((?:pago|confirmado|pendente)\)\s*$/i,'').trim();
     if (!s || /^\d+$/.test(s) || /^https?:\/\//i.test(s) || /[:=]/.test(s)) continue;
     if (!/[\p{L}]/u.test(s)||s.length>64)continue;
     if (!result.some(r=>normalize(r)===normalize(s))) result.push(s);

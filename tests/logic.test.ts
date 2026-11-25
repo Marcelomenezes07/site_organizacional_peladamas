@@ -10,6 +10,12 @@ describe('Listas de WhatsApp',()=>{
   it('reconhece acentos e apelidos',()=>{
     expect(matchPlayer('jogador a',starterPlayers)?.name).toBe('Jogador Á');
     expect(matchPlayer('desconhecido',starterPlayers)).toBeNull();
+    // O WhatsApp copia marcas invisíveis de direção, espaços de largura zero e "~" de contatos não salvos.
+    const pasted='1. \u2068Jogador Á\u2069\n2.\u00A0~ Jogador\u200B 02\n3\uFE0F\u20E3 Jogador 08 ⚽\n4. \u200EJogador 08';
+    const names=parseWhatsAppList(pasted);
+    expect(names).toEqual(['Jogador Á','Jogador 02','Jogador 08']);
+    expect(names.map(n=>matchPlayer(n,starterPlayers)?.name)).toEqual(['Jogador Á','Jogador 02','Jogador 08']);
+    expect(matchPlayer('Jogador\u200E 02',starterPlayers)?.name).toBe('Jogador 02');
   });
 });
 describe('CSV e estrelas',()=>{
