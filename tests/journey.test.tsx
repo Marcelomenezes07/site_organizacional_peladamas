@@ -10,7 +10,7 @@ const button=(name:string)=>Array.from(document.querySelectorAll('button')).find
 const click=async(name:string)=>{const b=button(name);expect(b,name).toBeTruthy();await act(async()=>b!.click());};
 const input=async(el:HTMLInputElement|HTMLTextAreaElement,value:string)=>{await act(async()=>{Object.getOwnPropertyDescriptor(el instanceof HTMLTextAreaElement?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value')!.set!.call(el,value);el.dispatchEvent(new Event('input',{bubbles:true}));});};
 const newcomers=()=>Array.from(document.querySelectorAll<HTMLButtonElement>('.row.newcomer'));
-const inSheet=async(name:string)=>{const b=Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find(b=>b.textContent?.trim()===name);expect(b,name).toBeTruthy();await act(async()=>b!.click());};
+const inSheet=async(name:string)=>{const b=Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find(b=>b.textContent?.trim().startsWith(name));expect(b,name).toBeTruthy();await act(async()=>b!.click());};
 const players=Array.from({length:4},(_,i)=>({id:String(i),name:`Jogador${i}`,aliases:'',stars:3}));
 beforeEach(async()=>{
   Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});vi.stubGlobal('scrollTo',()=>{});
@@ -36,7 +36,7 @@ it('starts on Peladas with bottom tabs and keeps the review when going back to t
   expect(newcomers()).toHaveLength(7);
   await click('Alfa');
   await input(document.querySelector<HTMLInputElement>('#newcomer-name')!,'Alfa corrigido');
-  await inSheet('Confirmar novo');
+  await inSheet('Confirmar');
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   await click('Voltar');expect((document.querySelector('#whatslist') as HTMLTextAreaElement).value).toContain('Alfa');
   await click('Revisar 7 jogadores');
@@ -83,15 +83,16 @@ it('links a new name to a ranking player by suggestion or search, and can undo',
   await click('Paulo Braz');await inSheet('Paulo');
   expect(newcomers()).toHaveLength(1);
   expect(document.body.textContent).toContain('Na lista: Paulo Braz · vira apelido');
-  // Tocar no associado reabre o painel com ele marcado; "Confirmar novo" desfaz.
+  // Tocar no associado reabre o painel com ele marcado; "É novo" e "Confirmar" desfazem.
   await click('Paulo');
-  expect(document.querySelector('[role="dialog"] [aria-pressed="true"]')?.textContent).toBe('Paulo');
-  await inSheet('Confirmar novo');
+  expect(document.querySelector('[role="dialog"] [aria-pressed="true"]')?.textContent).toContain('Paulo');
+  await inSheet('É novo');await inSheet('Confirmar');
   expect(newcomers()).toHaveLength(2);
   await click('Paulo Braz');await inSheet('Paulo');
-  // "Jogador Três" não tem sugestão: o Jogador3 é escolhido pela busca.
+  // "Jogador Três" não tem sugestão: abre direto em "é novo"; o Jogador3 é escolhido pela busca.
   await click('Jogador Três');
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Sem sugestões');
+  expect(document.querySelector('[role="dialog"] h2')?.textContent).toBe('Jogador Três é novo');
+  await inSheet('Buscar no ranking');
   await input(document.querySelector<HTMLInputElement>('[aria-label="Buscar no ranking"]')!,'jogador3');
   await inSheet('Jogador3');
   expect(newcomers()).toHaveLength(0);
